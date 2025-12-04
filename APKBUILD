@@ -1,15 +1,15 @@
 # Maintainer: HADEON <hadean-eon-dev@proton.me>
 pkgname=alure
 pkgver=0.1.0
-pkgrel=0
+pkgrel=1
 pkgdesc="Package manager using fzf and python3"
 url="https://gitlab.alpinelinux.org/h8d13/alure"
 arch="noarch" 
 license="MIT"
 depends="python3 fzf"
 makedepends=""
-source="https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
-builddir="$srcdir/$pkgname-master"
+source="$pkgname-$pkgver.tar.gz::https://gitlab.alpinelinux.org/h8d13/alure/-/archive/v$pkgver/alure-v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-v$pkgver"
 options="!check"
 
 build() {
