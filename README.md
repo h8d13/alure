@@ -2,7 +2,7 @@
 
 > A walk or passage; -- applied to passages of various kinds.
 
-The sides of every street were covered with fresh alures of marble.
+*The sides of every street were covered with fresh alures of marble.*
 T. Warton.
 
 ## Install build tools
