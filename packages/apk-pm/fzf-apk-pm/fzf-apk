@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""
+fzf-apk: Interactive APK package manager using fzf
+"""
+
+import os
+import sys
+import subprocess
+import time
+from pathlib import Path
+
+# Colors
+class Colors:
+    RED = '\033[0;31m'
+    GREEN = '\033[0;32m'
+    BLUE = '\033[0;34m'
+    YELLOW = '\033[1;33m'
+    CYAN = '\033[0;36m'
+    NC = '\033[0m'
+
+# Configuration
+CACHE_DIR = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'fzf-apk'
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+CACHE_DURATION = 3600
+
+# Script directory - where preview scripts are located
+SCRIPT_DIR = Path(__file__).parent
+
+def strip_version(package_string):
+    """Strip version from package string."""
+    parts = package_string.split('-')
+    for i, part in enumerate(parts):
+        if part and part[0].isdigit():
+            return '-'.join(parts[:i])
+    return package_string
+
+def get_installed_packages():
+    """Get set of installed package names."""
+    result = subprocess.run(['apk', 'list', '-I'], capture_output=True, text=True)
+    installed = set()
+    if result.returncode == 0:
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                pkg_name = strip_version(line.split()[0])
+                installed.add(pkg_name)
+    return installed
+
+def update_cache():
+    """Update package cache."""
+    cache_file = CACHE_DIR / 'packages.cache'
+    
+    if cache_file.exists():
+        cache_age = time.time() - cache_file.stat().st_mtime
+        if cache_age < CACHE_DURATION:
+            return
+    
+    print(f"{Colors.CYAN}Updating cache...{Colors.NC}", file=sys.stderr)
+    result = subprocess.run(['apk', 'search', '-v', '-d', ''], capture_output=True, text=True, timeout=30)
+    if result.returncode == 0:
+        cache_file.write_text(result.stdout)
+
+def search_packages(query=''):
+    """Search and browse packages."""
+    update_cache()
+    
+    cache_file = CACHE_DIR / 'packages.cache'
+    if not cache_file.exists():
+        print(f"{Colors.RED}Cache not found{Colors.NC}")
+        return
+    
+    # Get installed packages
+    installed = get_installed_packages()
+    
+    # Mark packages
+    with open(cache_file) as f:
+        lines = f.readlines()
+    
+    marked = []
+    for line in lines:
+        if not line.strip():
+            continue
+        pkg_name = strip_version(line.split()[0])
+        marker = '[*]' if pkg_name in installed else '[ ]'
+        marked.append(f"{marker} {line}")
+    
+    # Sort if query provided
+    if query:
+        exact, prefix, contains, desc = [], [], [], []
+        q = query.lower()
+        
+        for line in marked:
+            pkg_part = line[4:]  # Skip marker
+            parts = pkg_part.split()
+            if not parts:
+                continue
+                
+            pkg_name = strip_version(parts[0]).lower()
+            
+            if pkg_name == q:
+                exact.append(line)
+            elif pkg_name.startswith(q):
+                prefix.append(line)
+            elif q in pkg_name:
+                contains.append(line)
+            elif q in pkg_part.lower():  # Search in full line (description too)
+                desc.append(line)
+        
+        marked = exact + prefix + contains + desc
+    
+    # Prepare scripts
+    info_script = SCRIPT_DIR / 'preview-info.sh'
+    deps_script = SCRIPT_DIR / 'preview-deps.sh'
+    
+    if not info_script.exists() or not deps_script.exists():
+        print(f"{Colors.RED}Preview scripts not found in {SCRIPT_DIR}{Colors.NC}")
+        print("Make sure preview-info.sh and preview-deps.sh are in the same directory")
+        return
+    
+    # Run fzf with tiebreak to prioritize earlier items
+    fzf = subprocess.Popen(
+        [
+            'fzf',
+            '--ansi',
+            '--multi',
+            '--border=rounded',
+            '--height=95%',
+            '--preview', f'{info_script} {{}}',
+            '--preview-window=right:40%:wrap:border-left',
+            '--header=[*]=installed | TAB:select | ENTER:install/remove | Ctrl-G:deps | Ctrl-I:info',
+            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
+            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
+            '--prompt=Search > ',
+            '--query=' + query,
+            '--preview-label=[ Info ]',
+            '--pointer=>',
+            '--marker=*',
+            '--tiebreak=index'  # When scores are equal, prefer items that appear earlier
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True
+    )
+    
+    stdout, _ = fzf.communicate(''.join(marked))
+    
+    if fzf.returncode == 0 and stdout:
+        for line in stdout.strip().split('\n'):
+            if not line:
+                continue
+            
+            is_installed = line.startswith('[*]')
+            pkg_line = line[4:]
+            pkg_name = strip_version(pkg_line.split()[0])
+            
+            if is_installed:
+                print(f"{Colors.YELLOW}Removing: {pkg_name}{Colors.NC}")
+                subprocess.run(['doas', 'apk', 'del', pkg_name])
+            else:
+                print(f"{Colors.GREEN}Installing: {pkg_name}{Colors.NC}")
+                subprocess.run(['doas', 'apk', 'add', pkg_name])
+
+def world_packages():
+    """Browse world packages (explicitly installed)."""
+    world_file = Path('/etc/apk/world')
+    
+    if not world_file.exists():
+        print(f"{Colors.RED}World file not found{Colors.NC}")
+        return
+    
+    # Read world file
+    world_pkgs = world_file.read_text().strip().split('\n')
+    
+    # Get full package info for each
+    pkg_lines = []
+    for pkg in world_pkgs:
+        if not pkg or pkg.startswith('#'):
+            continue
+        # Get package info
+        result = subprocess.run(['apk', 'list', '-I', pkg], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            pkg_lines.append(result.stdout.strip())
+    
+    if not pkg_lines:
+        print(f"{Colors.YELLOW}No packages in world{Colors.NC}")
+        return
+    
+    info_script = SCRIPT_DIR / 'preview-info.sh'
+    deps_script = SCRIPT_DIR / 'preview-deps.sh'
+    
+    fzf = subprocess.Popen(
+        [
+            'fzf',
+            '--ansi',
+            '--multi',
+            '--border=rounded',
+            '--height=95%',
+            '--preview', f'{info_script} {{}}',
+            '--preview-window=right:40%:wrap:border-left',
+            '--header=WORLD (explicit) | TAB:select | ENTER:remove | Ctrl-G:deps | Ctrl-I:info',
+            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
+            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
+            '--prompt=World > ',
+            '--preview-label=[ Info ]',
+            '--pointer=>',
+            '--marker=*'
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True
+    )
+    
+    stdout, _ = fzf.communicate('\n'.join(pkg_lines))
+    
+    if fzf.returncode == 0 and stdout:
+        for line in stdout.strip().split('\n'):
+            if line:
+                pkg_name = strip_version(line.split()[0])
+                print(f"{Colors.YELLOW}Removing from world: {pkg_name}{Colors.NC}")
+                subprocess.run(['doas', 'apk', 'del', pkg_name])
+
+def installed_packages():
+    """Browse installed packages."""
+    result = subprocess.run(['apk', 'list', '-I'], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"{Colors.RED}Error getting installed packages{Colors.NC}")
+        return
+    
+    info_script = SCRIPT_DIR / 'preview-info.sh'
+    deps_script = SCRIPT_DIR / 'preview-deps.sh'
+    
+    fzf = subprocess.Popen(
+        [
+            'fzf',
+            '--ansi',
+            '--multi',
+            '--border=rounded',
+            '--height=95%',
+            '--preview', f'{info_script} {{}}',
+            '--preview-window=right:40%:wrap:border-left',
+            '--header=TAB:select | ENTER:remove | Ctrl-U:upgrade | Ctrl-G:deps | Ctrl-I:info',
+            '--bind', 'ctrl-u:execute(doas apk upgrade {1})',
+            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
+            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
+            '--prompt=Installed > ',
+            '--preview-label=[ Info ]',
+            '--pointer=>',
+            '--marker=*'
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True
+    )
+    
+    stdout, _ = fzf.communicate(result.stdout)
+    
+    if fzf.returncode == 0 and stdout:
+        for line in stdout.strip().split('\n'):
+            if line:
+                pkg_name = strip_version(line.split()[0])
+                print(f"{Colors.YELLOW}Removing: {pkg_name}{Colors.NC}")
+                subprocess.run(['doas', 'apk', 'del', pkg_name])
+
+def search_pattern(pattern):
+    """Search by pattern."""
+    result = subprocess.run(['apk', 'search', pattern], capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        print(f"{Colors.YELLOW}No packages found{Colors.NC}")
+        return
+    
+    info_script = SCRIPT_DIR / 'preview-info.sh'
+    deps_script = SCRIPT_DIR / 'preview-deps.sh'
+    
+    fzf = subprocess.Popen(
+        [
+            'fzf',
+            '--ansi',
+            '--multi',
+            '--border=rounded',
+            '--height=95%',
+            '--preview', f'{info_script} {{}}',
+            '--preview-window=right:40%:wrap:border-left',
+            '--header=TAB:select | ENTER:install | Ctrl-G:deps | Ctrl-I:info',
+            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
+            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
+            '--prompt=Pattern > ',
+            '--preview-label=[ Info ]'
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True
+    )
+    
+    stdout, _ = fzf.communicate(result.stdout)
+    
+    if fzf.returncode == 0 and stdout:
+        for line in stdout.strip().split('\n'):
+            if line:
+                pkg_name = strip_version(line.split()[0])
+                print(f"{Colors.GREEN}Installing: {pkg_name}{Colors.NC}")
+                subprocess.run(['doas', 'apk', 'add', pkg_name])
+
+def show_deps(package):
+    """Show dependency graph."""
+    pkg_name = strip_version(package)
+    print(f"{Colors.BLUE}Dependencies: {pkg_name}{Colors.NC}\n")
+    result = subprocess.run(['apk', 'dot', pkg_name])
+    if result.returncode == 0:
+        print(f"\n{Colors.CYAN}Visualize: apk dot {pkg_name} | dot -Tpng > deps.png{Colors.NC}")
+
+def show_help():
+    """Show help."""
+    print(f"""
+{Colors.BLUE}fzf-apk{Colors.NC}: FZF-APK Package Manager
+
+{Colors.YELLOW}Commands:{Colors.NC}
+    search [query]       Search all packages (requires an original query)
+    installed            All installed packages
+    world                World packages (explicitly installed)
+    pattern <pattern>    Search by pattern with globing
+    update-cache         Update cache
+    help                 Show help
+
+{Colors.YELLOW}Keybindings:{Colors.NC}
+    TAB              Multi-select
+    ENTER            Install/remove
+    Ctrl-G           Dependency graph
+    Ctrl-I           Package info
+    Ctrl-R           Refresh
+    Ctrl-U           Upgrade
+
+{Colors.YELLOW}Examples:{Colors.NC}
+    fzf-apk search python
+    fzf-apk installed
+    fzf-apk world
+    fzf-apk pattern 'py3-*'
+
+{Colors.YELLOW}Note:{Colors.NC}
+    World file (/etc/apk/world) contains packages you explicitly installed.
+    Dependencies are tracked separately by apk.
+""")
+
+def main():
+    for cmd in ['apk', 'fzf', 'doas']:
+        if subprocess.run(['which', cmd], capture_output=True).returncode != 0:
+            print(f"{Colors.RED}'{cmd}' not found{Colors.NC}")
+            sys.exit(1)
+    
+    # Show help if no arguments
+    if len(sys.argv) < 2:
+        show_help()
+        sys.exit(0)
+    
+    command = sys.argv[1]
+    
+    if command == 'search':
+        if len(sys.argv) < 3:
+            print(f"{Colors.RED}Error: search query required{Colors.NC}")
+            print(f"Usage: fzf-apk search <query>")
+            sys.exit(1)
+        search_packages(sys.argv[2])
+    elif command == 'installed':
+        installed_packages()
+    elif command == 'world':
+        world_packages()
+    elif command == 'pattern':
+        if len(sys.argv) < 3:
+            print(f"{Colors.RED}Pattern required{Colors.NC}")
+            sys.exit(1)
+        search_pattern(sys.argv[2])
+    elif command == 'update-cache':
+        update_cache()
+    elif command in ['help', '--help', '-h']:
+        show_help()
+    else:
+        print(f"{Colors.RED}Unknown: {command}{Colors.NC}")
+        show_help()
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
