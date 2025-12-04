@@ -1,16 +1,16 @@
 # Maintainer: HADEON <hadean-eon-dev@proton.me>
-pkgname=apk-pm
+pkgname=alure
 pkgver=0.1.0
 pkgrel=0
-pkgdesc="Package manager using fzf and py3"
-url="https://example.com/examplepkg"
+pkgdesc="Package manager using fzf and python3"
+url="https://gitlab.alpinelinux.org/h8d13/alure"
 arch="all"
 license="MIT"
 depends="python3 fzf"
 makedepends=""
-source="https://example.com/$pkgname-$pkgver.tar.gz"
+source="https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
 builddir="$srcdir/$pkgname-$pkgver"
-
+# alure-pm/fzf-apk/
 # best is to have files already as executables
 # and inside a descriptive directory for sha sums
 # then we can simply add it to a $PATH bin and a simple wrapper
