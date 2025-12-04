@@ -8,7 +8,7 @@ arch="noarch"
 license="MIT"
 depends="python3 fzf"
 makedepends=""
-source="https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
+source="$pkgname-$pkgver.tar.gz::https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
 builddir="$srcdir/$pkgname-master"
 options="!check"
 
@@ -21,18 +21,19 @@ package() {
     cd "$builddir"
     
     # Install main executable
-    install -Dm755 alure-pm/fzf-apk/alure "$pkgdir"/usr/bin/alure
-    # Install helpers
-    install -Dm755 alure-pm/fzf-apk/preview-deps.sh "$pkgdir"/usr/bin/preview-deps.sh
-    install -Dm755 alure-pm/fzf-apk/preview-info.sh "$pkgdir"/usr/bin/preview-info.sh
+    install -Dm755 fzf-apk/alure-pm/alure "$pkgdir"/usr/bin/alure
     
-    # Optional: Install documentation
+    # Install helper scripts to a private lib directory (not in user's PATH)
+    install -Dm755 fzf-apk/alure-pm/preview-deps.sh "$pkgdir"/usr/lib/alure/preview-deps.sh
+    install -Dm755 fzf-apk/alure-pm/preview-info.sh "$pkgdir"/usr/lib/alure/preview-info.sh
+    
+    # Install documentation
     install -Dm644 README.md "$pkgdir"/usr/share/doc/$pkgname/README.md
     
-    # Optional: Install license file
+    # Install license file
     install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
 }
 
 sha512sums="
-6956bf45a2ae41db9c6f4db680929969a0d406dfb77e016f0641df4da2c7d76adc6944ddcbbd9c0368090fd47565eaa602d42073c483c71fc53a44a5a9bf1f67  alure-master.tar.gz
+b30c1e2423f4d1a9f47466a065117dc33c0faf973accab61ac9ce8db08eda24903d526f64ef6b391c3cfce4765ecdc3dba966e4d660b07b1f1703f20a4a1c3e9  alure-0.1.0.tar.gz
 "
