@@ -8,7 +8,7 @@ arch="noarch"
 license="MIT"
 depends="python3 fzf"
 makedepends=""
-source="$pkgname-$pkgver.tar.gz::https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
+source="https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
 builddir="$srcdir/$pkgname-master"
 options="!check"
 
@@ -35,5 +35,5 @@ package() {
 }
 
 sha512sums="
-b30c1e2423f4d1a9f47466a065117dc33c0faf973accab61ac9ce8db08eda24903d526f64ef6b391c3cfce4765ecdc3dba966e4d660b07b1f1703f20a4a1c3e9  alure-0.1.0.tar.gz
+6956bf45a2ae41db9c6f4db680929969a0d406dfb77e016f0641df4da2c7d76adc6944ddcbbd9c0368090fd47565eaa602d42073c483c71fc53a44a5a9bf1f67  alure-master.tar.gz
 "
