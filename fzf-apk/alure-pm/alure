@@ -243,7 +243,7 @@ def installed_packages():
             '--height=95%',
             '--preview', f'{info_script} {{}}',
             '--preview-window=right:40%:wrap:border-left',
-            '--header=TAB:select | ENTER:remove | Ctrl-U:upgrade | Ctrl-G:deps | Ctrl-I:info',
+            '--header=TAB:select | ENTER:remove | Ctrl-G:deps | Ctrl-I:info',
             '--bind', 'ctrl-u:execute(doas apk upgrade {1})',
             '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
             '--bind', f'ctrl-i:change-preview({info_script} {{}})',
@@ -310,13 +310,10 @@ def show_deps(package):
     pkg_name = strip_version(package)
     print(f"{Colors.BLUE}Dependencies: {pkg_name}{Colors.NC}\n")
     result = subprocess.run(['apk', 'dot', pkg_name])
-    if result.returncode == 0:
-        print(f"\n{Colors.CYAN}Visualize: apk dot {pkg_name} | dot -Tpng > deps.png{Colors.NC}")
 
 def show_help():
-    """Show help."""
     print(f"""
-{Colors.BLUE}fzf-apk{Colors.NC}: FZF-APK Package Manager
+{Colors.BLUE}fzf-apk : alure {Colors.NC}: FZF-APK Package Manager
 
 {Colors.YELLOW}Commands:{Colors.NC}
     search [query]       Search all packages (requires an original query)
@@ -331,8 +328,6 @@ def show_help():
     ENTER            Install/remove
     Ctrl-G           Dependency graph
     Ctrl-I           Package info
-    Ctrl-R           Refresh
-    Ctrl-U           Upgrade
 
 {Colors.YELLOW}Examples:{Colors.NC}
     fzf-apk search python
