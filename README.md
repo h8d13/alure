@@ -34,7 +34,7 @@ rm /var/cache/distfiles/alure-master.tar.gz
 abuild checksum
 abuild -r
 # add and test
-apk add --allow-untrusted ~/packages/user/x86_64/alure-0.1.0-r0.apk
+apk add --allow-untrusted doas apk add --allow-untrusted /home/user/packages/hadean/x86_64/alure-x.x.x-rx.apk
 alure help
 ```
 
