@@ -19,10 +19,14 @@ apk add alpine-sdk
 ## Useful for building
 
 ```
+#reset
+abuild clean cleanpkg cleancache
 rm /var/cache/distfiles/alure-master.tar.gz
+# push changes before
 abuild checksum
 abuild -r
-apk add --allow-untrusted ~/packages/x86_64/$1-*.apk
+# add and test
 apk add --allow-untrusted ~/packages/user/x86_64/alure-0.1.0-r0.apk
 alure help
 ```
+
