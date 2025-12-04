@@ -313,7 +313,7 @@ def show_deps(package):
 
 def show_help():
     print(f"""
-{Colors.BLUE}fzf-apk : alure {Colors.NC}: FZF-APK Package Manager
+{Colors.BLUE}fzf-apk : alure {Colors.NC}: TUI Package Search
 
 {Colors.YELLOW}Commands:{Colors.NC}
     search [query]       Search all packages (requires an original query)
@@ -337,7 +337,7 @@ def show_help():
 
 {Colors.YELLOW}Note:{Colors.NC}
     World file (/etc/apk/world) contains packages you explicitly installed.
-    Dependencies are tracked separately by apk.
+    Dependencies are tracked separately by apk. In the "installed" tab.
 """)
 
 def main():
