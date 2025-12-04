@@ -1,5 +1,10 @@
 # alure
 
+> A walk or passage; -- applied to passages of various kinds.
+
+The sides of every street were covered with fresh alures of marble.
+T. Warton.
+
 ## Install build tools
 
 ```
@@ -14,7 +19,7 @@ apk add alpine-sdk
 ## Create a package
 ## Browse community packages
 
-## Install a communnity package
+## Install a community package
 
 ```
 cd packages/$1
