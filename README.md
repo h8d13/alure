@@ -16,6 +16,14 @@ apk add alpine-sdk
 # - abuild-keygen: generates signing keys
 ```
 
+### Setup build
+
+```
+doas addgroup user abuild
+abuild-keygen -a -i
+```
+> Or something along those lines.
+
 ## Useful for building
 
 ```
