@@ -27,13 +27,13 @@ package() {
     install -Dm755 fzf-apk/alure-pm/preview-deps.sh "$pkgdir"/usr/lib/alure/preview-deps.sh
     install -Dm755 fzf-apk/alure-pm/preview-info.sh "$pkgdir"/usr/lib/alure/preview-info.sh
     
-    # Install documentation
-    install -Dm644 README.md "$pkgdir"/usr/share/doc/$pkgname/README.md
+    # Install documentation (should be seperate -doc pkg)
+    #install -Dm644 README.md "$pkgdir"/usr/share/doc/$pkgname/README.md
     
     # Install license file
     install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
 }
 
 sha512sums="
-6956bf45a2ae41db9c6f4db680929969a0d406dfb77e016f0641df4da2c7d76adc6944ddcbbd9c0368090fd47565eaa602d42073c483c71fc53a44a5a9bf1f67  alure-master.tar.gz
+c4c91e1e007739bb7115ff3bbd470daa39e14a96e43aede4f70c0e5eaeab528e5859baf77845a340454e6d1961633d0938f1c14b7b08965265f8052f13595f7c  alure-master.tar.gz
 "
