@@ -27,5 +27,5 @@ package() {
     install -Dm755 preview-info.sh "$pkgdir/usr/lib/alure/preview-info.sh"
 }
 sha512sums="
-5cf80d38175e177d6959296f19029d8bc570bb5b033173054058843bc3c4916d854344e1e58ed3a04920a6a509a7f6928e325debab1401ae267daae712e76ef3  alure-master.tar.gz
+5ee1c245cf8bb18d03b606fd59a71d8c3280477d88c96b3c7599a4ed1cd8e498bbec9a637f3d70fa5d93d33d09627def57c3546d124f33994c63bcb55dcb9da2  alure-master.tar.gz
 "
