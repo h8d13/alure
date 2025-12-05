@@ -1,6 +1,14 @@
 #!/bin/bash
+set -euo pipefail
 
-abuild clean cleanpkg cleancache
+# Make sure srcdir exists
+mkdir -p src
+
+# Fetch sources
+abuild fetch
+
+# Update checksums
 abuild checksum
-abuild -r
 
+# Build and package
+abuild -r

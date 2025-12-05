@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-fzf-apk: Interactive APK package searcher using fzf
+alure: Interactive APK package searcher using fzf
 """
 
 import os
@@ -617,11 +617,11 @@ def show_help():
     Ctrl-I           Package info
 
 {Colors.yellow("Examples:")}
-    fzf-apk all
-    fzf-apk search python
-    fzf-apk installed
-    fzf-apk world
-    fzf-apk pattern 'py3-*'
+    alure all
+    alure search python
+    alure installed
+    alure world
+    alure pattern 'py3-*'
 
 {Colors.yellow("Note:")}
     World file (/etc/apk/world) contains packages you explicitly installed.
@@ -660,7 +660,7 @@ def main():
     if command == 'search':
         if len(sys.argv) < 3:
             print(Colors.red("Error: search query required"))
-            print("Usage: fzf-apk search <query>")
+            print("Usage: alure search <query>")
             sys.exit(1)
         # search always searches both name and description with priority sorting
         search_packages(sys.argv[2], search_desc=True)
