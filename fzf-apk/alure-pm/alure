@@ -7,7 +7,9 @@ import os
 import sys
 import subprocess
 import time
+import re
 from pathlib import Path
+from typing import Optional, List
 
 # Colors
 class Colors:
@@ -17,6 +19,39 @@ class Colors:
     YELLOW = '\033[1;33m'
     CYAN = '\033[0;36m'
     NC = '\033[0m'
+
+    # Pre-compile regex for performance
+    _ansi_pattern = re.compile(r'\x1b\[[0-9;]*m')
+
+    @classmethod
+    def strip(cls, text: str) -> str:
+        """Remove all ANSI color codes from text."""
+        return cls._ansi_pattern.sub('', text)
+
+    @classmethod
+    def red(cls, text: str) -> str:
+        """Return text in red."""
+        return f"{cls.RED}{text}{cls.NC}"
+
+    @classmethod
+    def green(cls, text: str) -> str:
+        """Return text in green."""
+        return f"{cls.GREEN}{text}{cls.NC}"
+
+    @classmethod
+    def blue(cls, text: str) -> str:
+        """Return text in blue."""
+        return f"{cls.BLUE}{text}{cls.NC}"
+
+    @classmethod
+    def yellow(cls, text: str) -> str:
+        """Return text in yellow."""
+        return f"{cls.YELLOW}{text}{cls.NC}"
+
+    @classmethod
+    def cyan(cls, text: str) -> str:
+        """Return text in cyan."""
+        return f"{cls.CYAN}{text}{cls.NC}"
 
 # Configuration
 CACHE_DIR = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'fzf-apk'
@@ -31,6 +66,203 @@ else:
     # Running from installed location
     SCRIPT_DIR = Path('/usr/lib/alure')
 
+
+class PackageManager:
+    """Handles all APK package manager operations."""
+
+    @staticmethod
+    def search(pattern: str = '', verbose: bool = False, description: bool = False) -> Optional[str]:
+        """Search for packages."""
+        try:
+            cmd = ['apk', 'search']
+            if verbose:
+                cmd.append('-v')
+            if description:
+                cmd.append('-d')
+            if pattern:
+                cmd.append(pattern)
+            else:
+                cmd.append('')
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            return result.stdout if result.returncode == 0 else None
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+            print(Colors.red(f"Error searching packages: {e}"), file=sys.stderr)
+            return None
+
+    @staticmethod
+    def list_installed(package: str = '') -> Optional[str]:
+        """List installed packages."""
+        try:
+            cmd = ['apk', 'list', '-I']
+            if package:
+                cmd.append(package)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            return result.stdout if result.returncode == 0 else None
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error listing packages: {e}"), file=sys.stderr)
+            return None
+
+    @staticmethod
+    def install(package: str) -> bool:
+        """Install a package."""
+        try:
+            result = subprocess.run(['doas', 'apk', 'add', package])
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nInstallation cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error installing package: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
+    def remove(package: str) -> bool:
+        """Remove a package."""
+        try:
+            result = subprocess.run(['doas', 'apk', 'del', package])
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nRemoval cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error removing package: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
+    def upgrade(package: str = '') -> bool:
+        """Upgrade a package or all packages."""
+        try:
+            cmd = ['doas', 'apk', 'upgrade']
+            if package:
+                cmd.append(package)
+            result = subprocess.run(cmd)
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nUpgrade cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error upgrading package: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
+    def show_deps(package: str) -> bool:
+        """Show dependency graph."""
+        try:
+            result = subprocess.run(['apk', 'dot', package])
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nCancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error showing dependencies: {e}"), file=sys.stderr)
+            return False
+
+
+class FzfInterface:
+    """Handles all fzf interactions with consistent configuration."""
+
+    def __init__(self, script_dir: Path):
+        """Initialize fzf interface with preview script paths."""
+        self.info_script = script_dir / 'preview-info.sh'
+        self.deps_script = script_dir / 'preview-deps.sh'
+
+        if not self.info_script.exists() or not self.deps_script.exists():
+            raise FileNotFoundError(
+                f"Preview scripts not found in {script_dir}\n"
+                "Make sure preview-info.sh and preview-deps.sh are in the same directory"
+            )
+
+    def run(self,
+            input_data: str,
+            prompt: str = 'Search > ',
+            header: str = '',
+            query: str = '',
+            multi: bool = True,
+            extra_bindings: Optional[List[str]] = None,
+            extra_options: Optional[List[str]] = None,
+            border_label: str = '',
+            preview_label: str = '[ Info ]',
+            search_description: bool = False) -> Optional[str]:
+        """
+        Run fzf with common configuration.
+
+        Args:
+            input_data: Data to pass to fzf stdin
+            prompt: Prompt text to display
+            header: Header text with keybinding help
+            query: Initial query string
+            multi: Enable multi-selection
+            extra_bindings: Additional key bindings
+            extra_options: Additional fzf options
+            border_label: Label for the left panel border
+            preview_label: Label for the preview panel
+
+        Returns:
+            Selected lines as string, or None if cancelled
+        """
+        cmd = [
+            'fzf',
+            '--ansi',
+            '--border=rounded',
+            '--height=95%',
+            f'--preview={self.info_script} {{}}',
+            '--preview-window=right:40%:wrap:border-left',
+            f'--bind=ctrl-g:change-preview({self.deps_script} {{}})',
+            f'--bind=ctrl-i:change-preview({self.info_script} {{}})',
+            f'--prompt=  {prompt}',
+            f'--preview-label={preview_label}',
+            '--pointer=>',
+            '--marker=*',
+            '--info=default',
+            '--padding=1',
+            '--delimiter=\t',
+            '--with-nth=1,2',  # Display both fields: marker+package, description
+            f'--nth={1 if not search_description else "1,2"}',  # Search package only, or package+description
+            f'--tiebreak={("begin,index" if search_description else "index")}',  # Prioritize earlier matches when searching descriptions
+        ]
+
+        if border_label:
+            cmd.append(f'--border-label={border_label}')
+            cmd.append('--border-label-pos=top')
+
+        if header:
+            cmd.append(f'--header={header}')
+            cmd.append('--header-first')
+
+        if multi:
+            cmd.append('--multi')
+
+        if query:
+            cmd.append(f'--query={query}')
+
+        if extra_bindings:
+            for binding in extra_bindings:
+                cmd.append(f'--bind={binding}')
+
+        if extra_options:
+            cmd.extend(extra_options)
+
+        try:
+            fzf = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                text=True
+            )
+
+            stdout, _ = fzf.communicate(input_data)
+
+            if fzf.returncode == 0 and stdout:
+                return stdout.strip()
+            return None
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nSelection cancelled"))
+            return None
+        except (subprocess.SubprocessError, OSError) as e:
+            print(Colors.red(f"Error running fzf: {e}"), file=sys.stderr)
+            return None
+
 # Helper to strip version from names
 def strip_version(package_string):
     """Strip version from package string."""
@@ -40,332 +272,399 @@ def strip_version(package_string):
             return '-'.join(parts[:i])
     return package_string
 
+def loading_animation(duration=0.5):
+    """Show a brief loading animation before returning to menu."""
+    frames = ['|', '/', '—', '\\']
+    end_time = time.time() + duration
+    i = 0
+    while time.time() < end_time:
+        print(f'\r{frames[i % len(frames)]}', end='', flush=True)
+        time.sleep(0.1)
+        i += 1
+    print('\r ', end='', flush=True)  # Clear the animation
+
+def extract_package_name(line):
+    """Extract package name from marked line (with or without • prefix)."""
+    # Remove all ANSI codes
+    line = Colors.strip(line)
+    # Remove prefix (• or 2 spaces) - check once
+    if line[:2] in ('• ', '  '):
+        line = line[2:]
+    # Get first field (package name with version), split on any whitespace
+    pkg_full = line.split(None, 1)[0]
+    # Strip version
+    return strip_version(pkg_full)
+
 def get_installed_packages():
     """Get set of installed package names."""
-    result = subprocess.run(['apk', 'list', '-I'], capture_output=True, text=True)
+    result = PackageManager.list_installed()
+    if not result:
+        return set()
+
+    # Use set comprehension for efficiency
     installed = set()
-    if result.returncode == 0:
-        for line in result.stdout.strip().split('\n'):
-            if line:
-                pkg_name = strip_version(line.split()[0])
-                installed.add(pkg_name)
+    for line in result.split('\n'):
+        if line and '[installed]' in line:
+            # Format: package-version-arch {origin} (license) [installed]
+            pkg_full = line.split(None, 1)[0]  # Get first field, split on any whitespace
+            pkg_name = strip_version(pkg_full)
+            installed.add(pkg_name)
     return installed
 
 def update_cache():
     """Update package cache."""
     cache_file = CACHE_DIR / 'packages.cache'
-    
+
     if cache_file.exists():
         cache_age = time.time() - cache_file.stat().st_mtime
         if cache_age < CACHE_DURATION:
             return
-    
-    print(f"{Colors.CYAN}Updating cache...{Colors.NC}", file=sys.stderr)
-    result = subprocess.run(['apk', 'search', '-v', '-d', ''], capture_output=True, text=True, timeout=30)
-    if result.returncode == 0:
-        cache_file.write_text(result.stdout)
 
-def search_packages(query=''):
+    print(Colors.cyan("Updating cache..."), file=sys.stderr)
+    result = PackageManager.search(pattern='', verbose=True, description=True)
+    if result:
+        cache_file.write_text(result)
+
+def search_packages(query='', search_desc=False):
     """Search and browse packages."""
     update_cache()
-    
+
     cache_file = CACHE_DIR / 'packages.cache'
     if not cache_file.exists():
-        print(f"{Colors.RED}Cache not found{Colors.NC}")
+        print(Colors.red("Cache not found"))
         return
-    
-    # Get installed packages
+
+    # Get installed packages once
     installed = get_installed_packages()
-    
-    # Mark packages
-    with open(cache_file) as f:
-        lines = f.readlines()
-    
-    marked = []
-    for line in lines:
-        if not line.strip():
-            continue
-        pkg_name = strip_version(line.split()[0])
-        marker = '[*]' if pkg_name in installed else '[ ]'
-        marked.append(f"{marker} {line}")
-    
-    # Sort if query provided
+
+    # Pre-calculate marker strings for installed status (will be in separate column)
+    installed_marker = f"{Colors.GREEN}•{Colors.NC}"
+    not_installed_marker = " "
+
+    # Build package list with proper column separation
+    # Format: marker<TAB>pkg_full<TAB>description
+    # This allows fzf to search and prioritize columns independently
+
+    # Find max package name length for alignment
+    MAX_PKG_WIDTH = 40  # Fixed width for alignment
+
     if query:
-        exact, prefix, contains, desc = [], [], [], []
+        # Sort by query match - use tuples for priority then sort
         q = query.lower()
-        
-        for line in marked:
-            pkg_part = line[4:]  # Skip marker
-            parts = pkg_part.split()
-            if not parts:
-                continue
-                
-            pkg_name = strip_version(parts[0]).lower()
-            
-            if pkg_name == q:
-                exact.append(line)
-            elif pkg_name.startswith(q):
-                prefix.append(line)
-            elif q in pkg_name:
-                contains.append(line)
-            elif q in pkg_part.lower():  # Search in full line (description too)
-                desc.append(line)
-        
-        marked = exact + prefix + contains + desc
-    
-    # Prepare scripts
-    info_script = SCRIPT_DIR / 'preview-info.sh'
-    deps_script = SCRIPT_DIR / 'preview-deps.sh'
-    
-    if not info_script.exists() or not deps_script.exists():
-        print(f"{Colors.RED}Preview scripts not found in {SCRIPT_DIR}{Colors.NC}")
-        print("Make sure preview-info.sh and preview-deps.sh are in the same directory")
+        matches = []
+
+        with open(cache_file) as f:
+            for line in f:
+                line = line.rstrip('\n')
+                if not line:
+                    continue
+
+                # Parse: "package-version - description"
+                parts = line.split(' - ', 1)
+                pkg_full = parts[0]
+                description = parts[1] if len(parts) > 1 else ''
+
+                pkg_name = strip_version(pkg_full.split()[0])
+                pkg_name_lower = pkg_name.lower()
+                line_lower = line.lower()
+
+                # Determine priority
+                if pkg_name_lower == q:
+                    priority = 0
+                elif pkg_name_lower.startswith(q):
+                    priority = 1
+                elif q in pkg_name_lower:
+                    priority = 2
+                elif q in line_lower:
+                    priority = 3
+                else:
+                    continue  # Skip non-matches to save memory
+
+                is_installed = pkg_name in installed
+                marker = installed_marker if is_installed else not_installed_marker
+                # Pad package name for alignment
+                pkg_padded = pkg_full.ljust(MAX_PKG_WIDTH)
+                # Format: marker pkg_padded<TAB>description (space after marker, tab before desc)
+                matches.append((priority, f"{marker} {pkg_padded}\t{description}\n"))
+
+        # Sort by priority and build output
+        matches.sort(key=lambda x: x[0])
+        input_data = ''.join(match[1] for match in matches)
+    else:
+        # No query - build with column separation for proper fzf prioritization
+        lines = []
+        with open(cache_file) as f:
+            for line in f:
+                line = line.rstrip('\n')
+                if not line:
+                    continue
+
+                # Parse: "package-version - description"
+                parts = line.split(' - ', 1)
+                pkg_full = parts[0]
+                description = parts[1] if len(parts) > 1 else ''
+
+                pkg_name = strip_version(pkg_full.split()[0])
+                is_installed = pkg_name in installed
+                marker = installed_marker if is_installed else not_installed_marker
+                # Pad package name for alignment
+                pkg_padded = pkg_full.ljust(MAX_PKG_WIDTH)
+                # Format: marker pkg_padded<TAB>description (space after marker, tab before desc)
+                lines.append(f"{marker} {pkg_padded}\t{description}\n")
+
+        input_data = ''.join(lines)
+
+    # Check if we have data
+    if not input_data.strip():
+        print(Colors.red("Error: No packages to display"))
         return
-    
-    # Run fzf with tiebreak to prioritize earlier items
-    fzf = subprocess.Popen(
-        [
-            'fzf',
-            '--ansi',
-            '--multi',
-            '--border=rounded',
-            '--height=95%',
-            '--preview', f'{info_script} {{}}',
-            '--preview-window=right:40%:wrap:border-left',
-            '--header=[*]=installed | TAB:select | ENTER:install/remove | Ctrl-G:deps | Ctrl-I:info',
-            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
-            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
-            '--prompt=Search > ',
-            '--query=' + query,
-            '--preview-label=[ Info ]',
-            '--pointer=>',
-            '--marker=*',
-            '--tiebreak=index'  # When scores are equal, prefer items that appear earlier
-        ],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        text=True
+
+    # Use FzfInterface
+    try:
+        fzf = FzfInterface(SCRIPT_DIR)
+    except FileNotFoundError as e:
+        print(Colors.red(str(e)))
+        return
+
+    # For interactive search, remove the extra options that break filtering
+    result = fzf.run(
+        input_data=input_data,
+        prompt='Search > ',
+        header='•:installed  ⏎:install/remove',
+        query=query,
+        extra_options=['--tiebreak=index'] if query else [],
+        border_label='[ Packages ]',
+        preview_label='[ Info ]',
+        multi=False,
+        search_description=search_desc
     )
-    
-    stdout, _ = fzf.communicate(''.join(marked))
-    
-    if fzf.returncode == 0 and stdout:
-        for line in stdout.strip().split('\n'):
-            if not line:
-                continue
-            
-            is_installed = line.startswith('[*]')
-            pkg_line = line[4:]
-            pkg_name = strip_version(pkg_line.split()[0])
-            
-            if is_installed:
-                print(f"{Colors.YELLOW}Removing: {pkg_name}{Colors.NC}")
-                subprocess.run(['doas', 'apk', 'del', pkg_name])
-            else:
-                print(f"{Colors.GREEN}Installing: {pkg_name}{Colors.NC}")
-                subprocess.run(['doas', 'apk', 'add', pkg_name])
+
+    if result:
+        # Check if installed
+        is_installed = '•' in result
+
+        # Get package name
+        pkg_name = extract_package_name(result)
+
+        if is_installed:
+            print(Colors.yellow(f"Removing: {pkg_name}"))
+            success = PackageManager.remove(pkg_name)
+            if success:
+                print(Colors.green(f"Successfully removed: {pkg_name}"))
+        else:
+            print(Colors.green(f"Installing: {pkg_name}"))
+            success = PackageManager.install(pkg_name)
+            if success:
+                print(Colors.green(f"Successfully installed: {pkg_name}"))
+
+        # Brief loading animation before returning to menu
+        loading_animation(0.5)
+        # Return to menu (recursive call)
+        search_packages(query)
 
 def world_packages():
     """Browse world packages (explicitly installed)."""
     world_file = Path('/etc/apk/world')
-    
+
     if not world_file.exists():
-        print(f"{Colors.RED}World file not found{Colors.NC}")
+        print(Colors.red("World file not found"))
         return
-    
-    # Read world file
-    world_pkgs = world_file.read_text().strip().split('\n')
-    
-    # Get full package info for each
+
+    # Read world file - filter empty/comment lines immediately
+    world_pkgs = [
+        line.strip() for line in world_file.read_text().split('\n')
+        if line.strip() and not line.startswith('#')
+    ]
+
+    # Get full package info for each (batch processing would be better but apk doesn't support it)
     pkg_lines = []
     for pkg in world_pkgs:
-        if not pkg or pkg.startswith('#'):
-            continue
-        # Get package info
-        result = subprocess.run(['apk', 'list', '-I', pkg], capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout.strip():
-            pkg_lines.append(result.stdout.strip())
-    
+        result = PackageManager.list_installed(pkg)
+        if result:
+            stripped = result.strip()
+            if stripped:
+                pkg_lines.append(stripped)
+
     if not pkg_lines:
-        print(f"{Colors.YELLOW}No packages in world{Colors.NC}")
+        print(Colors.yellow("No packages in world"))
         return
-    
-    info_script = SCRIPT_DIR / 'preview-info.sh'
-    deps_script = SCRIPT_DIR / 'preview-deps.sh'
-    
-    fzf = subprocess.Popen(
-        [
-            'fzf',
-            '--ansi',
-            '--multi',
-            '--border=rounded',
-            '--height=95%',
-            '--preview', f'{info_script} {{}}',
-            '--preview-window=right:40%:wrap:border-left',
-            '--header=WORLD (explicit) | TAB:select | ENTER:remove | Ctrl-G:deps | Ctrl-I:info',
-            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
-            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
-            '--prompt=World > ',
-            '--preview-label=[ Info ]',
-            '--pointer=>',
-            '--marker=*'
-        ],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        text=True
+
+    # Use FzfInterface
+    try:
+        fzf = FzfInterface(SCRIPT_DIR)
+    except FileNotFoundError as e:
+        print(Colors.red(str(e)))
+        return
+
+    result = fzf.run(
+        input_data='\n'.join(pkg_lines),
+        prompt='World > ',
+        header='Explicit packages  ⏎:remove',
+        border_label='[ Packages ]',
+        preview_label='[ Info ]',
+        multi=False
     )
-    
-    stdout, _ = fzf.communicate('\n'.join(pkg_lines))
-    
-    if fzf.returncode == 0 and stdout:
-        for line in stdout.strip().split('\n'):
-            if line:
-                pkg_name = strip_version(line.split()[0])
-                print(f"{Colors.YELLOW}Removing from world: {pkg_name}{Colors.NC}")
-                subprocess.run(['doas', 'apk', 'del', pkg_name])
+
+    if result:
+        pkg_name = extract_package_name(result)
+        print(Colors.yellow(f"Removing from world: {pkg_name}"))
+        success = PackageManager.remove(pkg_name)
+        if success:
+            print(Colors.green(f"Successfully removed: {pkg_name}"))
+
+        # Brief loading animation before returning to menu
+        loading_animation(0.5)
+        # Return to menu
+        world_packages()
 
 def installed_packages():
     """Browse installed packages."""
-    result = subprocess.run(['apk', 'list', '-I'], capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"{Colors.RED}Error getting installed packages{Colors.NC}")
+    result = PackageManager.list_installed()
+    if not result:
+        print(Colors.red("Error getting installed packages"))
         return
-    
-    info_script = SCRIPT_DIR / 'preview-info.sh'
-    deps_script = SCRIPT_DIR / 'preview-deps.sh'
-    
-    fzf = subprocess.Popen(
-        [
-            'fzf',
-            '--ansi',
-            '--multi',
-            '--border=rounded',
-            '--height=95%',
-            '--preview', f'{info_script} {{}}',
-            '--preview-window=right:40%:wrap:border-left',
-            '--header=TAB:select | ENTER:remove | Ctrl-G:deps | Ctrl-I:info',
-            '--bind', 'ctrl-u:execute(doas apk upgrade {1})',
-            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
-            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
-            '--prompt=Installed > ',
-            '--preview-label=[ Info ]',
-            '--pointer=>',
-            '--marker=*'
-        ],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        text=True
+
+    # Use FzfInterface
+    try:
+        fzf = FzfInterface(SCRIPT_DIR)
+    except FileNotFoundError as e:
+        print(Colors.red(str(e)))
+        return
+
+    fzf_result = fzf.run(
+        input_data=result,
+        prompt='Installed > ',
+        header='⏎:remove  ^U:upgrade',
+        extra_bindings=['ctrl-u:execute(doas apk upgrade {1})'],
+        border_label='[ Packages ]',
+        preview_label='[ Info ]',
+        multi=False
     )
-    
-    stdout, _ = fzf.communicate(result.stdout)
-    
-    if fzf.returncode == 0 and stdout:
-        for line in stdout.strip().split('\n'):
-            if line:
-                pkg_name = strip_version(line.split()[0])
-                print(f"{Colors.YELLOW}Removing: {pkg_name}{Colors.NC}")
-                subprocess.run(['doas', 'apk', 'del', pkg_name])
+
+    if fzf_result:
+        pkg_name = extract_package_name(fzf_result)
+        print(Colors.yellow(f"Removing: {pkg_name}"))
+        success = PackageManager.remove(pkg_name)
+        if success:
+            print(Colors.green(f"Successfully removed: {pkg_name}"))
+
+        # Brief loading animation before returning to menu
+        loading_animation(0.5)
+        # Return to menu
+        installed_packages()
 
 def search_pattern(pattern):
     """Search by pattern."""
-    result = subprocess.run(['apk', 'search', pattern], capture_output=True, text=True)
-    if result.returncode != 0 or not result.stdout.strip():
-        print(f"{Colors.YELLOW}No packages found{Colors.NC}")
+    result = PackageManager.search(pattern)
+    if not result or not result.strip():
+        print(Colors.yellow("No packages found"))
         return
-    
-    info_script = SCRIPT_DIR / 'preview-info.sh'
-    deps_script = SCRIPT_DIR / 'preview-deps.sh'
-    
-    fzf = subprocess.Popen(
-        [
-            'fzf',
-            '--ansi',
-            '--multi',
-            '--border=rounded',
-            '--height=95%',
-            '--preview', f'{info_script} {{}}',
-            '--preview-window=right:40%:wrap:border-left',
-            '--header=TAB:select | ENTER:install | Ctrl-G:deps | Ctrl-I:info',
-            '--bind', f'ctrl-g:change-preview({deps_script} {{}})',
-            '--bind', f'ctrl-i:change-preview({info_script} {{}})',
-            '--prompt=Pattern > ',
-            '--preview-label=[ Info ]'
-        ],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        text=True
+
+    # Use FzfInterface
+    try:
+        fzf = FzfInterface(SCRIPT_DIR)
+    except FileNotFoundError as e:
+        print(Colors.red(str(e)))
+        return
+
+    fzf_result = fzf.run(
+        input_data=result,
+        prompt='Pattern > ',
+        header='⏎:install',
+        border_label='[ Packages ]',
+        preview_label='[ Info ]',
+        multi=False
     )
-    
-    stdout, _ = fzf.communicate(result.stdout)
-    
-    if fzf.returncode == 0 and stdout:
-        for line in stdout.strip().split('\n'):
-            if line:
-                pkg_name = strip_version(line.split()[0])
-                print(f"{Colors.GREEN}Installing: {pkg_name}{Colors.NC}")
-                subprocess.run(['doas', 'apk', 'add', pkg_name])
+
+    if fzf_result:
+        pkg_name = extract_package_name(fzf_result)
+        print(Colors.green(f"Installing: {pkg_name}"))
+        success = PackageManager.install(pkg_name)
+        if success:
+            print(Colors.green(f"Successfully installed: {pkg_name}"))
+
+        # Brief loading animation before returning to menu
+        loading_animation(0.5)
+        # Return to menu
+        search_pattern(pattern)
 
 def show_deps(package):
     """Show dependency graph."""
     pkg_name = strip_version(package)
-    print(f"{Colors.BLUE}Dependencies: {pkg_name}{Colors.NC}\n")
-    result = subprocess.run(['apk', 'dot', pkg_name])
+    print(Colors.blue(f"Dependencies: {pkg_name}\n"))
+    PackageManager.show_deps(pkg_name)
 
 def show_help():
     print(f"""
-{Colors.BLUE}fzf-apk : alure {Colors.NC}: TUI Package Search
+{Colors.blue("fzf-apk : alure")}: TUI Package Search
 
-{Colors.YELLOW}Commands:{Colors.NC}
-    search [query]       Search all packages (requires an original query)
+{Colors.yellow("Commands:")}
+    all [-d]             Browse all packages with empty search
+    search <query>       Search packages by name/description with priority sorting
     installed            All installed packages
     world                World packages (explicitly installed)
     pattern <pattern>    Search by pattern with globing
     update-cache         Update cache
     help                 Show help
 
-{Colors.YELLOW}Keybindings:{Colors.NC}
+{Colors.yellow("Flags:")}
+    -d                   (all mode only) Also search descriptions
+
+{Colors.yellow("Keybindings:")}
     TAB              Multi-select
     ENTER            Install/remove
     Ctrl-G           Dependency graph
     Ctrl-I           Package info
 
-{Colors.YELLOW}Examples:{Colors.NC}
+{Colors.yellow("Examples:")}
+    fzf-apk all
     fzf-apk search python
     fzf-apk installed
     fzf-apk world
     fzf-apk pattern 'py3-*'
 
-{Colors.YELLOW}Note:{Colors.NC}
+{Colors.yellow("Note:")}
     World file (/etc/apk/world) contains packages you explicitly installed.
     Dependencies are tracked separately by apk. In the "installed" tab.
 """)
 
 def main():
+    # Check required commands efficiently (avoid spawning 'which' subprocess)
+    import shutil
     for cmd in ['apk', 'fzf', 'doas']:
-        if subprocess.run(['which', cmd], capture_output=True).returncode != 0:
-            print(f"{Colors.RED}'{cmd}' not found{Colors.NC}")
+        if not shutil.which(cmd):
+            print(Colors.red(f"'{cmd}' not found"))
             sys.exit(1)
-    
+
     # Show help if no arguments
     if len(sys.argv) < 2:
         show_help()
         sys.exit(0)
-    
+
+    # Check for -d flag
+    search_desc = '-d' in sys.argv
+    if search_desc:
+        sys.argv.remove('-d')
+
     command = sys.argv[1]
-    
+
     if command == 'search':
         if len(sys.argv) < 3:
-            print(f"{Colors.RED}Error: search query required{Colors.NC}")
-            print(f"Usage: fzf-apk search <query>")
+            print(Colors.red("Error: search query required"))
+            print("Usage: fzf-apk search <query>")
             sys.exit(1)
-        search_packages(sys.argv[2])
+        # search always searches both name and description with priority sorting
+        search_packages(sys.argv[2], search_desc=True)
+    elif command == 'all':
+        # all uses -d flag to control description searching
+        search_packages('', search_desc)
     elif command == 'installed':
         installed_packages()
     elif command == 'world':
         world_packages()
     elif command == 'pattern':
         if len(sys.argv) < 3:
-            print(f"{Colors.RED}Pattern required{Colors.NC}")
+            print(Colors.red("Pattern required"))
             sys.exit(1)
         search_pattern(sys.argv[2])
     elif command == 'update-cache':
@@ -373,7 +672,7 @@ def main():
     elif command in ['help', '--help', '-h']:
         show_help()
     else:
-        print(f"{Colors.RED}Unknown: {command}{Colors.NC}")
+        print(Colors.red(f"Unknown: {command}"))
         show_help()
         sys.exit(1)
 

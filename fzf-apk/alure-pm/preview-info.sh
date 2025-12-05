@@ -3,13 +3,16 @@
 
 line="$1"
 
-# Strip marker [*] or [ ]
-line=$(echo "$line" | sed 's/^\[.\] //')
+# Strip ANSI codes first
+line=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g')
 
-# Get package name (first field)
-pkg=$(echo "$line" | awk '{print $1}')
+# Get field 1 (marker + package), strip marker (• or space at start)
+pkg_field=$(echo "$line" | cut -f1 | sed 's/^[• ] *//')
 
-# Strip version: remove everything after first dash followed by digit
+# Get package name (first word)
+pkg=$(echo "$pkg_field" | awk '{print $1}')
+
+# Strip version
 pkg=$(echo "$pkg" | sed 's/-[0-9].*//')
 
 # Query package info
