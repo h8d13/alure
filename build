@@ -6,9 +6,5 @@ rm -f /var/cache/distfiles/alure-master.tar.gz
 
 # Fetch sources
 abuild fetch
-
-# Update checksums
-abuild checksum
-
 # Build and package
 abuild -r
