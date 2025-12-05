@@ -1,7 +1,7 @@
 # Maintainer: HADEON <hadean-eon-dev@proton.me>
 pkgname=alure
 pkgver=0.1.1
-pkgrel=1
+pkgrel=2
 pkgdesc="Package manager using fzf and python3"
 url="https://gitlab.alpinelinux.org/h8d13/alure"
 arch="noarch"
@@ -28,5 +28,5 @@ package() {
 }
 
 sha512sums="
-5b97150e089a9ceba0fc548af43134da35f93e3356722a4ebfccb757e09c0d4c2a757e076ae93ca44a845a40eae92deb0abdffe46f28c36f281b7bd27f16bf74  alure-master.tar.gz
+78d2e673f9baa56ebf48b57ca238188dc0ee89157c65ae3d8dfded8ed2d60fcf96510f108fc72400a4609156cec77bba1966c2c4d5c31ca06438cbd6a92b8efb  alure-master.tar.gz
 "
