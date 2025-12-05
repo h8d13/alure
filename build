@@ -1,21 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-# Clean cached files from distfiles
-rm -f /var/cache/distfiles/alure
-rm -f /var/cache/distfiles/preview-deps.sh
-rm -f /var/cache/distfiles/preview-info.sh
+# Clean the cache to ensure fresh download
+rm -f /var/cache/distfiles/alure-master.tar.gz
 
-# Copy local files to build location (abuild expects them in the current dir)
-cp fzf-apk/alure-pm/alure .
-cp fzf-apk/alure-pm/preview-deps.sh .
-cp fzf-apk/alure-pm/preview-info.sh .
+# Fetch sources
+abuild fetch
 
 # Update checksums
 abuild checksum
 
 # Build and package
 abuild -r
-
-# Clean up copied files
-rm -f alure preview-deps.sh preview-info.sh

@@ -8,16 +8,12 @@ arch="noarch"
 license="MIT"
 depends="python3 fzf"
 makedepends=""
-source="alure
-	preview-deps.sh
-	preview-info.sh
-	"
-builddir="$srcdir"
+source="https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
+builddir="$srcdir/alure-master/fzf-apk/alure-pm"
 options="!check"
 
 prepare() {
-    # Files are already in srcdir from source list
-    return 0
+    default_prepare
 }
 
 build() {
