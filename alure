@@ -678,9 +678,9 @@ def main():
         search_pattern(sys.argv[2])
     elif command == 'update-cache':
         update_cache()
-    elif command in ['help', '--help', '-h']:
+    elif command in ['help', 'h']:
         show_help()
-    elif command in ['version', '--version', '-v']:
+    elif command in ['version', 'v']:
         print(f'{V_STRING}')
         sys.exit(0)
     else:
