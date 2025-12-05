@@ -1,0 +1,6 @@
+#!/bin/bash
+
+abuild clean cleanpkg cleancache
+abuild checksum
+abuild -r
+

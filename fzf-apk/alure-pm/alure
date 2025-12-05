@@ -642,10 +642,19 @@ def main():
         show_help()
         sys.exit(0)
 
-    # Check for -d flag
-    search_desc = '-d' in sys.argv or (print(f'Unrecognized flag{sys.argv}'), sys.exit(1))
+    # Define supported flag for command 'all'
+    supported_flags = ['-d']
+    
+    # Check for -d flag and remove it from queue
+    search_desc = '-d' in sys.argv 
     if search_desc:
         sys.argv.remove('-d')
+
+    # Exit on unsupported flags
+    unsupported_flags = [arg for arg in sys.argv[1:] if arg.startswith('-') and arg not in supported_flags]
+    if unsupported_flags:
+        print(Colors.red(f"Error: Unsupported flag(s): {' '.join(unsupported_flags)}"))
+        sys.exit(1)
 
     command = sys.argv[1]
 
@@ -674,6 +683,7 @@ def main():
         show_help()
     elif command in ['version', '--version', '-v']:
         print(f'{V_STRING}')
+        sys.exit(0)
     else:
         print(Colors.red(f"Unknown: {command}"))
         show_help()
