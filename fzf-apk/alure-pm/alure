@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-fzf-apk: Interactive APK package manager using fzf
+fzf-apk: Interactive APK package searcher using fzf
 """
 
 import os
@@ -612,7 +612,6 @@ def show_help():
     help                 Show help
 
 {Colors.yellow("Keybindings:")}
-    TAB              Multi-select
     ENTER            Install/remove
     Ctrl-G           Dependency graph
     Ctrl-I           Package info
