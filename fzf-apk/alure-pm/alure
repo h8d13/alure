@@ -643,7 +643,7 @@ def main():
         sys.exit(0)
 
     # Check for -d flag
-    search_desc = '-d' in sys.argv
+    search_desc = '-d' in sys.argv or (print(f'Unrecognized flag{sys.argv}'), sys.exit(1))
     if search_desc:
         sys.argv.remove('-d')
 
