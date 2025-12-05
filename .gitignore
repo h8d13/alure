@@ -4,3 +4,6 @@ __pycache__/
 src/
 tmp/
 pkg/
+srcdir/
+APKBUILD
+build
