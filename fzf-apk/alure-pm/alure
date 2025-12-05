@@ -11,6 +11,9 @@ import re
 from pathlib import Path
 from typing import Optional, List
 
+## Used for help
+V_STRING="0.1.1-r1"
+
 # Colors
 class Colors:
     RED = '\033[0;31m'
@@ -596,7 +599,7 @@ def show_deps(package):
 
 def show_help():
     print(f"""
-{Colors.blue("fzf-apk : alure")}: TUI Package Search
+{Colors.blue("fzf-apk : alure")} - {V_STRING} TUI Package Search
 
 {Colors.yellow("Commands:")}
     all [-d]             Browse all packages with empty search
@@ -605,10 +608,8 @@ def show_help():
     world                World packages (explicitly installed)
     pattern <pattern>    Search by pattern with globing
     update-cache         Update cache
+    version              Print version
     help                 Show help
-
-{Colors.yellow("Flags:")}
-    -d                   (all mode only) Also search descriptions
 
 {Colors.yellow("Keybindings:")}
     TAB              Multi-select
@@ -671,6 +672,8 @@ def main():
         update_cache()
     elif command in ['help', '--help', '-h']:
         show_help()
+    elif command in ['version', '--version', '-v']:
+        print(f'{V_STRING}')
     else:
         print(Colors.red(f"Unknown: {command}"))
         show_help()
