@@ -788,6 +788,13 @@ def main():
                 sys.exit(1)
             result = subprocess.run([str(run_script), sys.argv[3]])
             sys.exit(result.returncode)
+        elif subcmd == 'clean':
+            clean_script = SCRIPT_DIR / 'fp-clean.sh'
+            if not clean_script.exists():
+                print(Colors.red(f"Clean script not found: {clean_script}"))
+                sys.exit(1)
+            result = subprocess.run([str(clean_script)])
+            sys.exit(result.returncode)
         else:
             wrap_script = SCRIPT_DIR / 'fp-wrap.sh'
             if not wrap_script.exists():
