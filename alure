@@ -149,6 +149,41 @@ class PackageManager:
             return False
 
     @staticmethod
+    def update_and_upgrade() -> bool:
+        """Update package index and upgrade all packages."""
+        try:
+            # First update the package index
+            print(Colors.cyan("Updating package index..."))
+            update_result = subprocess.run(['doas', 'apk', 'update'])
+            if update_result.returncode != 0:
+                print(Colors.red("Failed to update package index"))
+                return False
+
+            # Then upgrade all packages with --available flag
+            print(Colors.cyan("Upgrading packages..."))
+            upgrade_result = subprocess.run(['doas', 'apk', 'upgrade', '--available'])
+            return upgrade_result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nUpdate/upgrade cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error updating/upgrading: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
+    def clean() -> bool:
+        """Clean APK cache."""
+        try:
+            result = subprocess.run(['doas', 'apk', 'cache', 'clean'])
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nClean cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error cleaning cache: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
     def show_deps(package: str) -> bool:
         """Show dependency graph."""
         try:
@@ -607,6 +642,9 @@ def show_help():
     installed            All installed packages
     world                World packages (explicitly installed)
     pattern <pattern>    Search by pattern with globing
+    up                   Update package index and upgrade all packages
+    clean                Clean APK cache
+    history [-l N|-f N]  View APK log history (last N, first N, or all)
     update-cache         Update cache
     version              Print version
     help                 Show help
@@ -622,6 +660,10 @@ def show_help():
     alure installed
     alure world
     alure pattern 'py3-*'
+    alure up
+    alure clean
+    alure history
+    alure history -l 20
 
 {Colors.yellow("Note:")}
     World file (/etc/apk/world) contains packages you explicitly installed.
@@ -641,21 +683,27 @@ def main():
         show_help()
         sys.exit(0)
 
-    # Define supported flag for command 'all'
-    supported_flags = ['-d']
-    
-    # Check for -d flag and remove it from queue
-    search_desc = '-d' in sys.argv 
-    if search_desc:
+    command = sys.argv[1]
+
+    # Define supported flags per command
+    command_flags = {
+        'all': ['-d'],
+        'history': ['-l', '-f']
+    }
+
+    # Check for -d flag for 'all' command and remove it from queue
+    search_desc = False
+    if command == 'all' and '-d' in sys.argv:
+        search_desc = True
         sys.argv.remove('-d')
 
-    # Exit on unsupported flags
-    unsupported_flags = [arg for arg in sys.argv[1:] if arg.startswith('-') and arg not in supported_flags]
-    if unsupported_flags:
-        print(Colors.red(f"Error: Unsupported flag(s): {' '.join(unsupported_flags)}"))
-        sys.exit(1)
-
-    command = sys.argv[1]
+    # Exit on unsupported flags (skip validation for history command as it passes flags to script)
+    if command not in ['history']:
+        supported_flags = command_flags.get(command, [])
+        unsupported_flags = [arg for arg in sys.argv[1:] if arg.startswith('-') and arg not in supported_flags]
+        if unsupported_flags:
+            print(Colors.red(f"Error: Unsupported flag(s): {' '.join(unsupported_flags)}"))
+            sys.exit(1)
 
     if command == 'search':
         if len(sys.argv) < 3:
@@ -676,6 +724,27 @@ def main():
             print(Colors.red("Pattern required"))
             sys.exit(1)
         search_pattern(sys.argv[2])
+    elif command == 'up':
+        success = PackageManager.update_and_upgrade()
+        if success:
+            print(Colors.green("System updated and upgraded successfully"))
+        sys.exit(0 if success else 1)
+    elif command == 'clean':
+        success = PackageManager.clean()
+        if success:
+            print(Colors.green("APK cache cleaned successfully"))
+        sys.exit(0 if success else 1)
+    elif command == 'history':
+        history_script = SCRIPT_DIR / 'history.sh'
+        if not history_script.exists():
+            print(Colors.red(f"History script not found: {history_script}"))
+            sys.exit(1)
+        try:
+            result = subprocess.run([str(history_script)] + sys.argv[2:])
+            sys.exit(result.returncode)
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error running history: {e}"), file=sys.stderr)
+            sys.exit(1)
     elif command == 'update-cache':
         update_cache()
     elif command in ['help', 'h']:
