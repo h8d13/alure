@@ -7,13 +7,22 @@ A walk or passage; -- applied to passages of various kinds.
 
 ---
 
-`Alure` is a helper for both APK and Flatpak using fzf and python under the hood. 
+`Alure` is a helper for both `apk` and `flatpak` using `fzf` and `python` nder the hood. 
 
+## Setup
 
+### Run directly in python
 
+`git clone git@gitlab.alpinelinux.org:h8d13/alure.git`
 
-```
-alure help
-```
+`python alure help`
+
+### Install globally with apk
+
+---
+
+## Building
+
+Code in `master` or seperate branch. Then use aports to ship.
 
 
