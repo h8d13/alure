@@ -264,7 +264,7 @@ class FlatpakManager:
             return None
 
     @staticmethod
-    def run(app: str) -> bool:
+    def run(app: str, background: bool = False) -> bool:
         """Run a Flatpak application (with fuzzy matching)."""
         try:
             # Try to find the app if not an exact app ID
@@ -273,8 +273,19 @@ class FlatpakManager:
                 print(Colors.red(f"No app matching '{app}' found"))
                 return False
 
-            result = subprocess.run(['flatpak', 'run', app_id])
-            return result.returncode == 0
+            if background:
+                # Run in background, detached from terminal
+                subprocess.Popen(
+                    ['flatpak', 'run', app_id],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                print(Colors.green(f"Started {app_id} in background"))
+                return True
+            else:
+                result = subprocess.run(['flatpak', 'run', app_id])
+                return result.returncode == 0
         except KeyboardInterrupt:
             print(Colors.yellow("\nRun cancelled"))
             return False
@@ -784,6 +795,7 @@ def show_help():
     alure fp setup
     alure fp search
     alure fp run spotify
+    alure fp run -b spotify    # run in background
     alure fp clean
     alure fp list
 
@@ -819,8 +831,8 @@ def main():
         search_desc = True
         sys.argv.remove('-d')
 
-    # Exit on unsupported flags (skip validation for history command as it passes flags to script)
-    if command not in ['history']:
+    # Exit on unsupported flags (skip validation for history and fp commands as they handle their own flags)
+    if command not in ['history', 'fp']:
         supported_flags = command_flags.get(command, [])
         unsupported_flags = [arg for arg in sys.argv[1:] if arg.startswith('-') and arg not in supported_flags]
         if unsupported_flags:
@@ -876,6 +888,23 @@ def main():
             sys.exit(1)
 
         subcmd = sys.argv[2]
+
+        # Define supported flags per fp subcommand
+        fp_command_flags = {
+            'setup': [],
+            'search': [],
+            'run': ['-b'],
+            'clean': []
+        }
+
+        # Validate flags for known subcommands (skip validation for passthrough commands)
+        if subcmd in fp_command_flags:
+            supported_flags = fp_command_flags[subcmd]
+            unsupported_flags = [arg for arg in sys.argv[3:] if arg.startswith('-') and arg not in supported_flags]
+            if unsupported_flags:
+                print(Colors.red(f"Error: Unsupported flag(s) for 'fp {subcmd}': {' '.join(unsupported_flags)}"))
+                sys.exit(1)
+
         if subcmd == 'setup':
             success = FlatpakManager.setup()
             if success:
@@ -891,11 +920,22 @@ def main():
             result = subprocess.run([str(search_script), search_term])
             sys.exit(result.returncode)
         elif subcmd == 'run':
-            if len(sys.argv) < 4:
+            # Parse flags and app name
+            background = False
+            app_name = None
+
+            for arg in sys.argv[3:]:
+                if arg == '-b':
+                    background = True
+                elif not app_name:
+                    app_name = arg
+
+            if not app_name:
                 print(Colors.red("Error: app name required"))
-                print("Usage: alure fp run <appname>")
+                print("Usage: alure fp run [-b] <appname>")
                 sys.exit(1)
-            success = FlatpakManager.run(sys.argv[3])
+
+            success = FlatpakManager.run(app_name, background=background)
             sys.exit(0 if success else 1)
         elif subcmd == 'clean':
             print(Colors.cyan("Removing unused Flatpak runtimes..."))
