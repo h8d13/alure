@@ -646,7 +646,7 @@ def show_help():
     clean                Clean APK cache
     history [-l N|-f N]  View APK log history (last N, first N, or all)
     update-cache         Update cache
-    fp <cmd> [args]      Flatpak wrapper (setup|search|run|<flatpak-cmd>)
+    fp <cmd> [args]      Flatpak wrapper (setup|search|run|clean|<flatpak-cmd>)
     version              Print version
     help                 Show help
 
@@ -669,6 +669,7 @@ def show_help():
     alure fp search
     alure fp search spotify
     alure fp run spotify
+    alure fp clean
     alure fp list
 
 {Colors.yellow("Note:")}
