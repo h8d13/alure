@@ -197,6 +197,118 @@ class PackageManager:
             return False
 
 
+class FlatpakManager:
+    """Handles all Flatpak operations."""
+
+    @staticmethod
+    def setup() -> bool:
+        """Set up Flatpak with Flathub repository."""
+        try:
+            result = subprocess.run([
+                'flatpak', 'remote-add', '--if-not-exists',
+                'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'
+            ])
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nSetup cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error setting up Flatpak: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
+    def search(query: str = '') -> Optional[str]:
+        """Search for Flatpak applications."""
+        try:
+            cmd = ['flatpak', 'search']
+            if query:
+                cmd.append(query)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            return result.stdout if result.returncode == 0 else None
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+            print(Colors.red(f"Error searching Flatpak apps: {e}"), file=sys.stderr)
+            return None
+
+    @staticmethod
+    def list_apps() -> Optional[str]:
+        """List installed Flatpak applications."""
+        try:
+            result = subprocess.run(
+                ['flatpak', 'list', '--app', '--columns=application'],
+                capture_output=True, text=True
+            )
+            return result.stdout if result.returncode == 0 else None
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error listing Flatpak apps: {e}"), file=sys.stderr)
+            return None
+
+    @staticmethod
+    def find_app(query: str) -> Optional[str]:
+        """Find installed app by partial name match."""
+        try:
+            result = subprocess.run(
+                ['flatpak', 'list', '--app', '--columns=application'],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return None
+
+            # Search for case-insensitive match
+            query_lower = query.lower()
+            for line in result.stdout.split('\n'):
+                if line and query_lower in line.lower():
+                    return line.strip()
+            return None
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error finding Flatpak app: {e}"), file=sys.stderr)
+            return None
+
+    @staticmethod
+    def run(app: str) -> bool:
+        """Run a Flatpak application (with fuzzy matching)."""
+        try:
+            # Try to find the app if not an exact app ID
+            app_id = FlatpakManager.find_app(app)
+            if not app_id:
+                print(Colors.red(f"No app matching '{app}' found"))
+                return False
+
+            result = subprocess.run(['flatpak', 'run', app_id])
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nRun cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error running Flatpak app: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
+    def clean() -> bool:
+        """Remove unused Flatpak runtimes and dependencies."""
+        try:
+            result = subprocess.run(['flatpak', 'uninstall', '--unused', '-y'])
+            return result.returncode == 0
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nClean cancelled"))
+            return False
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error cleaning Flatpak: {e}"), file=sys.stderr)
+            return False
+
+    @staticmethod
+    def command(args: List[str]) -> int:
+        """Execute arbitrary Flatpak command with arguments."""
+        try:
+            result = subprocess.run(['flatpak'] + args)
+            return result.returncode
+        except KeyboardInterrupt:
+            print(Colors.yellow("\nCommand cancelled"))
+            return 130  # Standard exit code for SIGINT
+        except subprocess.SubprocessError as e:
+            print(Colors.red(f"Error executing Flatpak command: {e}"), file=sys.stderr)
+            return 1
+
+
 class FzfInterface:
     """Handles all fzf interactions with consistent configuration."""
 
@@ -757,17 +869,15 @@ def main():
     elif command == 'fp':
         if len(sys.argv) < 3:
             print(Colors.red("Error: fp subcommand required"))
-            print("Usage: alure fp <setup|search|run|<flatpak-cmd>> [args]")
+            print("Usage: alure fp <setup|search|run|clean|<flatpak-cmd>> [args]")
             sys.exit(1)
 
         subcmd = sys.argv[2]
         if subcmd == 'setup':
-            setup_script = SCRIPT_DIR / 'fp-setup.sh'
-            if not setup_script.exists():
-                print(Colors.red(f"Setup script not found: {setup_script}"))
-                sys.exit(1)
-            result = subprocess.run([str(setup_script)])
-            sys.exit(result.returncode)
+            success = FlatpakManager.setup()
+            if success:
+                print(Colors.green("Flatpak setup completed successfully"))
+            sys.exit(0 if success else 1)
         elif subcmd == 'search':
             search_script = SCRIPT_DIR / 'fp-search.sh'
             if not search_script.exists():
@@ -782,26 +892,18 @@ def main():
                 print(Colors.red("Error: app name required"))
                 print("Usage: alure fp run <appname>")
                 sys.exit(1)
-            run_script = SCRIPT_DIR / 'fp-run.sh'
-            if not run_script.exists():
-                print(Colors.red(f"Run script not found: {run_script}"))
-                sys.exit(1)
-            result = subprocess.run([str(run_script), sys.argv[3]])
-            sys.exit(result.returncode)
+            success = FlatpakManager.run(sys.argv[3])
+            sys.exit(0 if success else 1)
         elif subcmd == 'clean':
-            clean_script = SCRIPT_DIR / 'fp-clean.sh'
-            if not clean_script.exists():
-                print(Colors.red(f"Clean script not found: {clean_script}"))
-                sys.exit(1)
-            result = subprocess.run([str(clean_script)])
-            sys.exit(result.returncode)
+            print(Colors.cyan("Removing unused Flatpak runtimes..."))
+            success = FlatpakManager.clean()
+            if success:
+                print(Colors.green("Flatpak cleanup completed successfully"))
+            sys.exit(0 if success else 1)
         else:
-            wrap_script = SCRIPT_DIR / 'fp-wrap.sh'
-            if not wrap_script.exists():
-                print(Colors.red(f"Wrapper script not found: {wrap_script}"))
-                sys.exit(1)
-            result = subprocess.run([str(wrap_script)] + sys.argv[2:])
-            sys.exit(result.returncode)
+            # Pass through to flatpak command
+            returncode = FlatpakManager.command(sys.argv[2:])
+            sys.exit(returncode)
     elif command in ['help', 'h']:
         show_help()
     elif command in ['version', 'v']:
