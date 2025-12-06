@@ -202,8 +202,30 @@ class FlatpakManager:
 
     @staticmethod
     def setup() -> bool:
-        """Set up Flatpak with Flathub repository."""
+        """Set up Flatpak with Flathub repository and required packages."""
         try:
+            # Install required packages for certificate handling
+            required_packages = [
+                'p11-kit-trust',
+                'p11-kit-server',
+                'nss-tools'
+            ]
+
+            print(Colors.cyan("Installing required packages for Flatpak..."))
+            for package in required_packages:
+                print(f"  Installing {package}...")
+                result = subprocess.run(['doas', 'apk', 'add', package])
+                if result.returncode != 0:
+                    print(Colors.yellow(f"  Warning: Failed to install {package}"))
+
+            # Update CA certificates
+            print(Colors.cyan("Updating CA certificates..."))
+            result = subprocess.run(['doas', 'update-ca-certificates'])
+            if result.returncode != 0:
+                print(Colors.yellow("  Warning: Failed to update CA certificates"))
+
+            # Add Flathub repository
+            print(Colors.cyan("Adding Flathub repository..."))
             result = subprocess.run([
                 'flatpak', 'remote-add', '--if-not-exists',
                 'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'
