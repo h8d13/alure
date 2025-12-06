@@ -646,6 +646,7 @@ def show_help():
     clean                Clean APK cache
     history [-l N|-f N]  View APK log history (last N, first N, or all)
     update-cache         Update cache
+    fp <cmd> [args]      Flatpak wrapper (setup|search|run|<flatpak-cmd>)
     version              Print version
     help                 Show help
 
@@ -664,6 +665,11 @@ def show_help():
     alure clean
     alure history
     alure history -l 20
+    alure fp setup
+    alure fp search
+    alure fp search spotify
+    alure fp run spotify
+    alure fp list
 
 {Colors.yellow("Note:")}
     World file (/etc/apk/world) contains packages you explicitly installed.
@@ -747,6 +753,47 @@ def main():
             sys.exit(1)
     elif command == 'update-cache':
         update_cache()
+    elif command == 'fp':
+        if len(sys.argv) < 3:
+            print(Colors.red("Error: fp subcommand required"))
+            print("Usage: alure fp <setup|search|run|<flatpak-cmd>> [args]")
+            sys.exit(1)
+
+        subcmd = sys.argv[2]
+        if subcmd == 'setup':
+            setup_script = SCRIPT_DIR / 'fp-setup.sh'
+            if not setup_script.exists():
+                print(Colors.red(f"Setup script not found: {setup_script}"))
+                sys.exit(1)
+            result = subprocess.run([str(setup_script)])
+            sys.exit(result.returncode)
+        elif subcmd == 'search':
+            search_script = SCRIPT_DIR / 'fp-search.sh'
+            if not search_script.exists():
+                print(Colors.red(f"Search script not found: {search_script}"))
+                sys.exit(1)
+            # pass search term if provided
+            search_term = sys.argv[3] if len(sys.argv) > 3 else ''
+            result = subprocess.run([str(search_script), search_term])
+            sys.exit(result.returncode)
+        elif subcmd == 'run':
+            if len(sys.argv) < 4:
+                print(Colors.red("Error: app name required"))
+                print("Usage: alure fp run <appname>")
+                sys.exit(1)
+            run_script = SCRIPT_DIR / 'fp-run.sh'
+            if not run_script.exists():
+                print(Colors.red(f"Run script not found: {run_script}"))
+                sys.exit(1)
+            result = subprocess.run([str(run_script), sys.argv[3]])
+            sys.exit(result.returncode)
+        else:
+            wrap_script = SCRIPT_DIR / 'fp-wrap.sh'
+            if not wrap_script.exists():
+                print(Colors.red(f"Wrapper script not found: {wrap_script}"))
+                sys.exit(1)
+            result = subprocess.run([str(wrap_script)] + sys.argv[2:])
+            sys.exit(result.returncode)
     elif command in ['help', 'h']:
         show_help()
     elif command in ['version', 'v']:
