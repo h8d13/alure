@@ -19,10 +19,13 @@ A walk or passage; -- applied to passages of various kinds.
 
 ### Install globally with apk
 
+`git clone -b aports git@gitlab.alpinelinux.org:h8d13/alure.git`
+`abuild -r`
+`doas apk add --allow-untrusted ~/packages/user/arch/alure-x.x.x-rx.apk`
+
 ---
 
 ## Building
 
 Code in `master` or seperate branch. Then use aports to ship.
-
-
+Removing cached files `rm -rf /var/cache/distfiles/*`
