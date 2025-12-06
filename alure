@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, List
 
 ## Used for help
-V_STRING="0.1.1"
+V_STRING="0.1.2"
 
 # Colors
 class Colors:
