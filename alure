@@ -413,6 +413,9 @@ class FzfInterface:
             print(Colors.red(f"Error running fzf: {e}"), file=sys.stderr)
             return None
 
+
+############## HELPERS
+
 # Helper to strip version from names
 def strip_version(package_string):
     """Strip version from package string."""
@@ -757,7 +760,7 @@ def show_help():
     up                   Update package index and upgrade all packages
     clean                Clean APK cache
     history [-l N|-f N]  View APK log history (last N, first N, or all)
-    update-cache         Update cache
+    update-cache         Update APK cache
     fp <cmd> [args]      Flatpak wrapper (setup|search|run|clean|<flatpak-cmd>)
     version              Print version
     help                 Show help
@@ -766,6 +769,7 @@ def show_help():
     ENTER            Install/remove
     Ctrl-G           Dependency graph
     Ctrl-I           Package info
+    ESC              Exit
 
 {Colors.yellow("Examples:")}
     alure all
@@ -779,7 +783,6 @@ def show_help():
     alure history -l 20
     alure fp setup
     alure fp search
-    alure fp search spotify
     alure fp run spotify
     alure fp clean
     alure fp list
