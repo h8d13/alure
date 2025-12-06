@@ -7,14 +7,12 @@ A walk or passage; -- applied to passages of various kinds.
 
 ---
 
+`Alure` is a helper for both APK and Flatpak using fzf and python under the hood. 
+
+
+
+
 ```
-alure all [-d]				# searches full list
-alure search python			# searches with a term
-alure installed				# searches installed + deps
-alure world  				# searches installed
-alure pattern 'py3-*'		# searches with glob
-alure update-cache			# refreshes cache
-alure version
 alure help
 ```
 
