@@ -25,7 +25,6 @@ package() {
     install -Dm755 alure "$pkgdir/usr/bin/alure"
     install -Dm755 preview-deps.sh "$pkgdir/usr/lib/alure/preview-deps.sh"
     install -Dm755 preview-info.sh "$pkgdir/usr/lib/alure/preview-info.sh"
-    install -Dm755 history.sh "$pkgdir/usr/lib/alure/history.sh"
-    install -Dm755 fp-search.sh "$pkgdir/usr/lib/alure/fp-search.sh"
+    install -Dm755 preview-hist.sh "$pkgdir/usr/lib/alure/preview-hist.sh"
 }
 sha512sums="SKIP"
