@@ -13,15 +13,29 @@ A walk or passage; -- applied to passages of various kinds.
 
 ### Run directly in python
 
-`git clone git@gitlab.alpinelinux.org:h8d13/alure.git`
+```sh
+git clone git@gitlab.alpinelinux.org:h8d13/alure.git
+cd alure
+python alure help
+```
 
-`python alure help`
+### Get the source code directly
+
+```sh
+wget https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz
+tar xzf alure-master.tar.gz
+cd alure-master
+python alure help
+```
+
 
 ### Install globally with apk
 
-`git clone -b aports git@gitlab.alpinelinux.org:h8d13/alure.git`
-`abuild -r`
-`doas apk add --allow-untrusted ~/packages/user/arch/alure-x.x.x-rx.apk`
+```sh
+git clone -b aports git@gitlab.alpinelinux.org:h8d13/alure.git
+abuild -r
+doas apk add --allow-untrusted ~/packages/user/arch/alure-x.x.x-rx.apk
+```
 
 ---
 
