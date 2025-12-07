@@ -1,3 +1,6 @@
+- v0.1.3-r1
+	- Add support for required by and installed files for world/installed tabs
+
 - v0.1.3
 	- Move flatpak related logic to main script
 	- Add runtime deps to flatpak search
