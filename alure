@@ -456,7 +456,6 @@ class FzfInterface:
 
         if header:
             cmd.append(f'--header={header}')
-            cmd.append('--header-first')
 
         if multi:
             cmd.append('--multi')
@@ -502,7 +501,8 @@ class FzfInterface:
                    preview_cmd: str = '',
                    preview_window: str = 'right:40%:wrap:border-left',
                    delimiter: str = '\t',
-                   with_nth: str = '1,2') -> Optional[str]:
+                   with_nth: str = '1,2',
+                   extra_bindings: Optional[List[str]] = None) -> Optional[str]:
         """
         Run fzf with custom preview command and options.
 
@@ -518,6 +518,7 @@ class FzfInterface:
             preview_window: Preview window configuration
             delimiter: Field delimiter
             with_nth: Display only these fields
+            extra_bindings: Additional key bindings
 
         Returns:
             Selected lines as string, or None if cancelled
@@ -545,13 +546,16 @@ class FzfInterface:
 
         if header:
             cmd.append(f'--header={header}')
-            cmd.append('--header-first')
 
         if multi:
             cmd.append('--multi')
 
         if query:
             cmd.append(f'--query={query}')
+
+        if extra_bindings:
+            for binding in extra_bindings:
+                cmd.append(f'--bind={binding}')
 
         try:
             fzf = subprocess.Popen(
@@ -740,11 +744,13 @@ def search_packages(query='', search_desc=False):
         return
 
     # For interactive search, remove the extra options that break filtering
+    info_script = fzf.info_script
     result = fzf.run(
         input_data=input_data,
         prompt='Search > ',
-        header='•:installed  ⏎:install/remove',
+        header='⏎:install/remove  ^Y:copy  ^G:deps  ^I:info',
         query=query,
+        extra_bindings=[f'ctrl-y:execute-silent({info_script} {{}} extract-name | wl-copy 2>/dev/null || {info_script} {{}} extract-name | xclip -selection clipboard 2>/dev/null)'],
         extra_options=['--tiebreak=index'] if query else [],
         border_label='[ APK Packages ]',
         preview_label='[ Info ]',
@@ -964,17 +970,25 @@ def search_flatpaks(query=''):
         return
 
     # Run fzf with custom preview command for flatpak
+    info_script = fzf.info_script
+    flatpak_info_cmd = "flatpak remote-info flathub $(echo {} | cut -f2) 2>/dev/null | sed 's/^[[:space:]]*//'"
+
     result = fzf.run_custom(
         input_data=input_data,
         prompt='Flatpak > ',
-        header='•:installed  ⏎:install/remove',
+        header='⏎:install/remove  ^Y:copy  ^G:deps  ^I:info',
         query=query,
         border_label='[ Flatpak Apps ]',
         preview_label='[ Info ]',
-        preview_cmd="flatpak remote-info flathub $(echo {} | cut -f2) 2>/dev/null | sed 's/^[[:space:]]*//'",
+        preview_cmd=flatpak_info_cmd,
         preview_window='right:50%:wrap:border-left:~0',
         delimiter='\t',
         with_nth='1,3',  # Display name and description
+        extra_bindings=[
+            f'ctrl-y:execute-silent({info_script} {{}} extract-appid | wl-copy 2>/dev/null || {info_script} {{}} extract-appid | xclip -selection clipboard 2>/dev/null)',
+            f'ctrl-g:change-preview({info_script} {{}} flatpak-deps)',
+            f'ctrl-i:change-preview({flatpak_info_cmd})'
+        ],
         multi=False
     )
 
@@ -1024,9 +1038,11 @@ def show_help():
 
 {Colors.yellow("Keybindings:")}
     ENTER            Install/remove
+    Ctrl-Y           Copy package/app name to clipboard
     Ctrl-G           Dependency graph
     Ctrl-I           Package info
-    ESC or Ctrl + C  Exit
+    ESC              Exit
+    Ctrl + C         Abort op
 
 {Colors.yellow("Examples:")}
     alure all

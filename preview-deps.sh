@@ -16,4 +16,10 @@ pkg=$(echo "$pkg_field" | awk '{print $1}')
 pkg=$(echo "$pkg" | sed 's/-[0-9].*//')
 
 # Show dependency graph
-apk dot "$pkg" 2>&1
+output=$(apk dot "$pkg" 2>&1)
+
+if [ -z "$output" ]; then
+    echo "No dependencies"
+else
+    echo "$output"
+fi
