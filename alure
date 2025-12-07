@@ -815,10 +815,15 @@ def world_packages():
         print(Colors.red(str(e)))
         return
 
+    info_script = fzf.info_script
     result = fzf.run(
         input_data='\n'.join(pkg_lines),
         prompt='World > ',
-        header='Explicit packages  ⏎:remove',
+        header='⏎:remove  ^G:deps  ^I:info  ^R:rdeps  ^L:files',
+        extra_bindings=[
+            f'ctrl-r:change-preview({info_script} {{}} rdepends)',
+            f'ctrl-l:change-preview({info_script} {{}} contents)'
+        ],
         border_label='[ World Packages ]',
         preview_label='[ Info ]',
         multi=False
@@ -850,11 +855,15 @@ def installed_packages():
         print(Colors.red(str(e)))
         return
 
+    info_script = fzf.info_script
     fzf_result = fzf.run(
         input_data=result,
         prompt='Installed > ',
-        header='⏎:remove  ^U:upgrade',
-        extra_bindings=['ctrl-u:execute(doas apk upgrade {1})'],
+        header='⏎:remove  ^G:deps  ^I:info  ^R:rdeps  ^L:files',
+        extra_bindings=[
+            f'ctrl-r:change-preview({info_script} {{}} rdepends)',
+            f'ctrl-l:change-preview({info_script} {{}} contents)'
+        ],
         border_label='[ Installed Packages ]',
         preview_label='[ Info ]',
         multi=False
@@ -889,7 +898,7 @@ def search_pattern(pattern):
     fzf_result = fzf.run(
         input_data=result,
         prompt='Pattern > ',
-        header='⏎:install',
+        header='⏎:install  ^G:deps  ^I:info',
         border_label='[ APK Packages ]',
         preview_label='[ Info ]',
         multi=False
@@ -1038,25 +1047,31 @@ def show_help():
 
 {Colors.yellow("Keybindings:")}
     ENTER            Install/remove
-    Ctrl-Y           Copy package/app name to clipboard
+    Ctrl-Y           Copy package/app to clipboard
     Ctrl-G           Dependency graph
     Ctrl-I           Package info
+    Ctrl-C           Abort op
     ESC              Exit
-    Ctrl + C         Abort op
 
+    Extra binds (Just for installed/world):
+
+    Ctrl+R          See required by
+    Ctrl+L          See installed files
+    
 {Colors.yellow("Examples:")}
     alure all
-    alure search python
     alure installed
     alure world
+
+    alure search python
     alure pattern 'py3-*'
     alure up
     alure clean
-    alure history
+    alure history | grep <something>
     alure history -l 20
+
     alure fp setup
     alure fp search
-    alure fp run spotify
     alure fp run -b spotify
     alure fp clean
     alure fp list

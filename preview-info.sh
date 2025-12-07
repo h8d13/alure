@@ -48,6 +48,32 @@ show_flatpak_deps() {
     fi
 }
 
+# Show packages that depend on this package (reverse dependencies)
+show_rdepends() {
+    line="$1"
+    # Get field 1 (marker + package), strip marker (• or space at start)
+    pkg_field=$(echo "$line" | cut -f1 | sed 's/^[• ] *//')
+    # Get package name (first word)
+    pkg=$(echo "$pkg_field" | awk '{print $1}')
+    # Strip version
+    pkg=$(echo "$pkg" | sed 's/-[0-9].*//')
+    # Query reverse dependencies
+    apk info -r "$pkg" 2>&1
+}
+
+# Show files installed by this package
+show_contents() {
+    line="$1"
+    # Get field 1 (marker + package), strip marker (• or space at start)
+    pkg_field=$(echo "$line" | cut -f1 | sed 's/^[• ] *//')
+    # Get package name (first word)
+    pkg=$(echo "$pkg_field" | awk '{print $1}')
+    # Strip version
+    pkg=$(echo "$pkg" | sed 's/-[0-9].*//')
+    # Query package contents
+    apk info -L "$pkg" 2>&1
+}
+
 # Main execution
 case "${2:-info}" in
     extract-name)
@@ -61,6 +87,14 @@ case "${2:-info}" in
     flatpak-deps)
         # Show flatpak dependencies
         show_flatpak_deps "$1"
+        ;;
+    rdepends)
+        # Show reverse dependencies
+        show_rdepends "$1"
+        ;;
+    contents)
+        # Show package contents/files
+        show_contents "$1"
         ;;
     info|*)
         # Show package info (default)
