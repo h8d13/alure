@@ -1,7 +1,7 @@
 # Maintainer: HADEON <hadean-eon-dev@proton.me>
 pkgname=alure
-pkgver=0.1.2
-pkgrel=1
+pkgver=0.1.3
+pkgrel=0
 pkgdesc="Package manager using fzf and python3"
 url="https://gitlab.alpinelinux.org/h8d13/alure"
 arch="noarch"

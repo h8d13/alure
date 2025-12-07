@@ -1,0 +1,6 @@
+- v0.1.3
+	- Move flatpak related logic to main script
+	- Add runtime deps to flatpak search
+	- Add copy names keyboard shortcut
+	- Fix display titles
+	- Consolidate all extraction utilities to preview-info script
