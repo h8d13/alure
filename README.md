@@ -7,17 +7,11 @@ A walk or passage; -- applied to passages of various kinds.
 
 ---
 
-`Alure` is a helper for both `apk` and `flatpak` using `fzf` and `python` nder the hood. 
+`Alure` is a helper for both `apk` and `flatpak` using `fzf` and `python` under the hood. 
+
+It wraps common package operations behind a fuzzy search interface. Enabling you can search, inspect, and manage packages without remembering exact names or all the commands of APK/Flatpak.
 
 ## Setup
-
-### Run directly in python
-
-```sh
-git clone git@gitlab.alpinelinux.org:h8d13/alure.git
-cd alure
-python alure help
-```
 
 ### Get the source code directly
 
@@ -28,6 +22,13 @@ cd alure-master
 python alure help
 ```
 
+### Run directly in python
+
+```sh
+git clone git@gitlab.alpinelinux.org:h8d13/alure.git
+cd alure
+python alure help
+```
 
 ### Install globally with apk
 
@@ -41,5 +42,5 @@ doas apk add --allow-untrusted ~/packages/user/arch/alure-x.x.x-rx.apk
 
 ## Building
 
-Code in `master` or seperate branch. Then use aports to ship.
+Code in `master` or seperate branch. Then use branch `aports` to ship.
 Removing cached files `rm -rf /var/cache/distfiles/*`
