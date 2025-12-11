@@ -1,3 +1,6 @@
+- v0.1.3-r2
+	- Fix resume browsing for all/search/installed/world/flatpak
+
 - v0.1.3-r1
 	- Add support for required by and installed files for world/installed tabs
 
