@@ -411,7 +411,7 @@ class FzfInterface:
             extra_options: Optional[List[str]] = None,
             border_label: str = '',
             preview_label: str = '[ Info ]',
-            search_description: bool = False) -> Optional[str]:
+            search_description: bool = False) -> tuple[Optional[str], Optional[str]]:
         """
         Run fzf with common configuration.
 
@@ -427,7 +427,7 @@ class FzfInterface:
             preview_label: Label for the preview panel
 
         Returns:
-            Selected lines as string, or None if cancelled
+            Tuple of (query_string, selected_lines) or (None, None) if cancelled
         """
         cmd = [
             'fzf',
@@ -448,6 +448,7 @@ class FzfInterface:
             '--with-nth=1,2',  # Display both fields: marker+package, description
             f'--nth={1 if not search_description else "1,2"}',  # Search package only, or package+description
             f'--tiebreak={("begin,index" if search_description else "index")}',  # Prioritize earlier matches when searching descriptions
+            '--print-query',  # Print the query string as first line
         ]
 
         if border_label:
@@ -481,14 +482,17 @@ class FzfInterface:
             stdout, _ = fzf.communicate(input_data)
 
             if fzf.returncode == 0 and stdout:
-                return stdout.strip()
-            return None
+                lines = stdout.strip().split('\n')
+                query_str = lines[0] if lines else ''
+                selection = '\n'.join(lines[1:]) if len(lines) > 1 else ''
+                return (query_str, selection if selection else None)
+            return (None, None)
         except KeyboardInterrupt:
             print(Colors.yellow("\nSelection cancelled"))
-            return None
+            return (None, None)
         except (subprocess.SubprocessError, OSError) as e:
             print(Colors.red(f"Error running fzf: {e}"), file=sys.stderr)
-            return None
+            return (None, None)
 
     def run_custom(self,
                    input_data: str,
@@ -502,7 +506,7 @@ class FzfInterface:
                    preview_window: str = 'right:40%:wrap:border-left',
                    delimiter: str = '\t',
                    with_nth: str = '1,2',
-                   extra_bindings: Optional[List[str]] = None) -> Optional[str]:
+                   extra_bindings: Optional[List[str]] = None) -> tuple[Optional[str], Optional[str]]:
         """
         Run fzf with custom preview command and options.
 
@@ -521,7 +525,7 @@ class FzfInterface:
             extra_bindings: Additional key bindings
 
         Returns:
-            Selected lines as string, or None if cancelled
+            Tuple of (query_string, selected_lines) or (None, None) if cancelled
         """
         cmd = [
             'fzf',
@@ -538,6 +542,7 @@ class FzfInterface:
             '--padding=1',
             f'--delimiter={delimiter}',
             f'--with-nth={with_nth}',
+            '--print-query',  # Print the query string as first line
         ]
 
         if border_label:
@@ -568,14 +573,17 @@ class FzfInterface:
             stdout, _ = fzf.communicate(input_data)
 
             if fzf.returncode == 0 and stdout:
-                return stdout.strip()
-            return None
+                lines = stdout.strip().split('\n')
+                query_str = lines[0] if lines else ''
+                selection = '\n'.join(lines[1:]) if len(lines) > 1 else ''
+                return (query_str, selection if selection else None)
+            return (None, None)
         except KeyboardInterrupt:
             print(Colors.yellow("\nSelection cancelled"))
-            return None
+            return (None, None)
         except (subprocess.SubprocessError, OSError) as e:
             print(Colors.red(f"Error running fzf: {e}"), file=sys.stderr)
-            return None
+            return (None, None)
 
 
 ############## HELPERS
@@ -745,7 +753,7 @@ def search_packages(query='', search_desc=False):
 
     # For interactive search, remove the extra options that break filtering
     info_script = fzf.info_script
-    result = fzf.run(
+    last_query, result = fzf.run(
         input_data=input_data,
         prompt='Search > ',
         header='⏎:install/remove  ^Y:copy  ^G:deps  ^I:info',
@@ -778,10 +786,10 @@ def search_packages(query='', search_desc=False):
 
         # Brief loading animation before returning to menu
         loading_animation(0.5)
-        # Return to menu (recursive call)
-        search_packages(query)
+        # Return to menu with the last search query preserved
+        search_packages(last_query if last_query else query, search_desc)
 
-def world_packages():
+def world_packages(query=''):
     """Browse world packages (explicitly installed)."""
     world_file = Path('/etc/apk/world')
 
@@ -816,10 +824,11 @@ def world_packages():
         return
 
     info_script = fzf.info_script
-    result = fzf.run(
+    last_query, result = fzf.run(
         input_data='\n'.join(pkg_lines),
         prompt='World > ',
         header='⏎:remove  ^G:deps  ^I:info  ^R:rdeps  ^L:files',
+        query=query,
         extra_bindings=[
             f'ctrl-r:change-preview({info_script} {{}} rdepends)',
             f'ctrl-l:change-preview({info_script} {{}} contents)'
@@ -838,10 +847,10 @@ def world_packages():
 
         # Brief loading animation before returning to menu
         loading_animation(0.5)
-        # Return to menu
-        world_packages()
+        # Return to menu with the last search query preserved
+        world_packages(last_query if last_query else query)
 
-def installed_packages():
+def installed_packages(query=''):
     """Browse installed packages."""
     result = PackageManager.list_installed()
     if not result:
@@ -856,10 +865,11 @@ def installed_packages():
         return
 
     info_script = fzf.info_script
-    fzf_result = fzf.run(
+    last_query, fzf_result = fzf.run(
         input_data=result,
         prompt='Installed > ',
         header='⏎:remove  ^G:deps  ^I:info  ^R:rdeps  ^L:files',
+        query=query,
         extra_bindings=[
             f'ctrl-r:change-preview({info_script} {{}} rdepends)',
             f'ctrl-l:change-preview({info_script} {{}} contents)'
@@ -878,8 +888,8 @@ def installed_packages():
 
         # Brief loading animation before returning to menu
         loading_animation(0.5)
-        # Return to menu
-        installed_packages()
+        # Return to menu with the last search query preserved
+        installed_packages(last_query if last_query else query)
 
 def search_pattern(pattern):
     """Search by pattern."""
@@ -982,7 +992,7 @@ def search_flatpaks(query=''):
     info_script = fzf.info_script
     flatpak_info_cmd = "flatpak remote-info flathub $(echo {} | cut -f2) 2>/dev/null | sed 's/^[[:space:]]*//'"
 
-    result = fzf.run_custom(
+    last_query, result = fzf.run_custom(
         input_data=input_data,
         prompt='Flatpak > ',
         header='⏎:install/remove  ^Y:copy  ^G:deps  ^I:info',
@@ -1024,8 +1034,8 @@ def search_flatpaks(query=''):
 
         # Brief loading animation before returning to menu
         loading_animation(0.5)
-        # Return to menu (recursive call)
-        search_flatpaks(query)
+        # Return to menu with the last search query preserved
+        search_flatpaks(last_query if last_query else query)
 
 def show_help():
     print(f"""
