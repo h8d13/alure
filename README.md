@@ -13,19 +13,10 @@ It wraps common package operations behind a fuzzy search interface. Enabling you
 
 ## Setup
 
-### Get the source code directly
-
-```sh
-wget https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz
-tar xzf alure-master.tar.gz
-cd alure-master
-python alure help
-```
-
 ### Run directly in python
 
 ```sh
-git clone git@gitlab.alpinelinux.org:h8d13/alure.git
+git clone <url>
 cd alure
 python alure help
 ```
@@ -33,14 +24,11 @@ python alure help
 ### Install globally with apk
 
 ```sh
-git clone -b aports git@gitlab.alpinelinux.org:h8d13/alure.git
+git clone <url>
 abuild -r
 doas apk add --allow-untrusted ~/packages/user/arch/alure-x.x.x-rx.apk
 ```
 
+
 ---
 
-## Building
-
-Code in `master` or seperate branch. Then use branch `aports` to ship.
-Removing cached files `rm -rf /var/cache/distfiles/*`
