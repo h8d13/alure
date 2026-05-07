@@ -3,12 +3,12 @@ pkgname=alure
 pkgver=0.1.4
 pkgrel=1
 pkgdesc="Package manager using fzf and python3"
-url="https://gitlab.alpinelinux.org/h8d13/alure"
+url="https://github.com/h8d13/alure"
 arch="noarch"
 license="MIT"
 depends="python3 fzf"
 makedepends=""
-source="https://gitlab.alpinelinux.org/h8d13/alure/-/archive/master/alure-master.tar.gz"
+source="alure-master.tar.gz::https://github.com/h8d13/alure/archive/refs/heads/master.tar.gz"
 builddir="$srcdir/alure-master"
 options="!check"
 
@@ -30,5 +30,5 @@ package() {
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }
 sha512sums="
-6e9c0ad28639c64e90261d45d3383684c034e8a18ba47294cf3be63849763019555c4d0573fde5b968f299f7aa40b321925ad05b6dc8c1a69f3dd1e1e0bcc1e6  alure-master.tar.gz
+97425777de57cae9948b90e91f2357b989aadd4b7d73fe2d7fa714e8b86d82164f0c5c50c750c6e2b4167608819bd759b90bd0afe09850ce216e63b4aa5110e9  alure-master.tar.gz
 "
