@@ -21,14 +21,14 @@ cd alure
 python alure help
 ```
 
-### Install globally with apk
+### From source
 
 ```sh
 git clone <url>
+cd alure
 abuild -r
-doas apk add --allow-untrusted ~/packages/user/arch/alure-x.x.x-rx.apk
+doas apk add ~/packages/user/arch/alure-x.x.x-rx.apk
+# adapt path
 ```
-
-
 ---
 
