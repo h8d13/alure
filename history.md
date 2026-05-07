@@ -1,5 +1,6 @@
 - v0.1.4
 	- Fix performance issue loading world/installed pkgs
+	- Prepare dev build scripts for several arch
 
 - v0.1.3-r2
 	- Fix resume browsing for all/search/installed/world/flatpak
