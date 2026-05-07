@@ -402,7 +402,8 @@ class FzfInterface:
             )
 
     def run(self,
-            input_data: str,
+            input_data: Optional[str] = None,
+            input_stream=None,
             prompt: str = 'Search > ',
             header: str = '',
             query: str = '',
@@ -472,14 +473,22 @@ class FzfInterface:
             cmd.extend(extra_options)
 
         try:
-            fzf = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                text=True
-            )
-
-            stdout, _ = fzf.communicate(input_data)
+            if input_stream is not None:
+                fzf = subprocess.Popen(
+                    cmd,
+                    stdin=input_stream,
+                    stdout=subprocess.PIPE,
+                    text=True
+                )
+                stdout, _ = fzf.communicate()
+            else:
+                fzf = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    text=True
+                )
+                stdout, _ = fzf.communicate(input_data)
 
             if fzf.returncode == 0 and stdout:
                 lines = stdout.strip().split('\n')
@@ -797,20 +806,25 @@ def world_packages(query=''):
         print(Colors.red("World file not found"))
         return
 
-    # Read world file - filter empty/comment lines immediately
-    world_pkgs = [
+    # Read world file as a set for O(1) membership checks
+    world_pkgs = {
         line.strip() for line in world_file.read_text().split('\n')
         if line.strip() and not line.startswith('#')
-    ]
+    }
 
-    # Get full package info for each (batch processing would be better but apk doesn't support it)
+    # One apk call for all installed packages, then filter by world set
+    all_installed = PackageManager.list_installed()
+    if not all_installed:
+        print(Colors.red("Error getting installed packages"))
+        return
+
     pkg_lines = []
-    for pkg in world_pkgs:
-        result = PackageManager.list_installed(pkg)
-        if result:
-            stripped = result.strip()
-            if stripped:
-                pkg_lines.append(stripped)
+    for line in all_installed.split('\n'):
+        if not line:
+            continue
+        pkg_full = line.split(None, 1)[0]
+        if strip_version(pkg_full) in world_pkgs:
+            pkg_lines.append(line)
 
     if not pkg_lines:
         print(Colors.yellow("No packages in world"))
@@ -852,11 +866,6 @@ def world_packages(query=''):
 
 def installed_packages(query=''):
     """Browse installed packages."""
-    result = PackageManager.list_installed()
-    if not result:
-        print(Colors.red("Error getting installed packages"))
-        return
-
     # Use FzfInterface
     try:
         fzf = FzfInterface(SCRIPT_DIR)
@@ -864,9 +873,19 @@ def installed_packages(query=''):
         print(Colors.red(str(e)))
         return
 
+    # Stream apk output directly into fzf so it renders progressively
+    try:
+        apk_proc = subprocess.Popen(
+            ['apk', 'list', '-I'],
+            stdout=subprocess.PIPE
+        )
+    except (subprocess.SubprocessError, OSError) as e:
+        print(Colors.red(f"Error listing packages: {e}"), file=sys.stderr)
+        return
+
     info_script = fzf.info_script
     last_query, fzf_result = fzf.run(
-        input_data=result,
+        input_stream=apk_proc.stdout,
         prompt='Installed > ',
         header='⏎:remove  ^G:deps  ^I:info  ^R:rdeps  ^L:files',
         query=query,
@@ -878,6 +897,11 @@ def installed_packages(query=''):
         preview_label='[ Info ]',
         multi=False
     )
+
+    # Clean up apk process
+    if apk_proc.stdout:
+        apk_proc.stdout.close()
+    apk_proc.wait()
 
     if fzf_result:
         pkg_name = extract_package_name(fzf_result)
